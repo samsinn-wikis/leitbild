@@ -38,8 +38,12 @@ Control-instance API routing lives under `src/core/api`. Client-side API helpers
 
 This wiki was first generated from the Leitbild project documentation, current scenario JSON, and architectural decisions in the application repo. It also follows patterns from `samsinn-wikis/pwr-ops` and the `michaelhil/llm-wiki-skills` project.
 
+## Future Project Sources
+
+The NPP process control pack concept in [[future-projects]] is a forward-looking design note. It is informed by the Leitbild pack/surface/event architecture and by the public [PWR Operations wiki](https://samsinn-wikis.github.io/pwr-ops/), especially its organization of Westinghouse-style PWR operating knowledge, procedure markdown, procedure families, and Samsinn integration notes. It is not an executable plant model or a licensing-grade engineering analysis.
+
 ## Screenshot Sources
 
 Screenshots live in `wiki/assets/screenshots` and are captured from the production Leitbild app. They illustrate scenario overviews, dispatch routing, settings, startup status, category visibility, and update indicators.
 
-Related pages: [[index]], [[concepts]], [[specs]], [[scenarios]].
+Related pages: [[index]], [[concepts]], [[specs]], [[scenarios]], [[future-projects]].
