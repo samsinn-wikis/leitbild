@@ -27,6 +27,8 @@ The assistant may issue a dispatch command only if its role and policy allow act
 
 A monitor agent watches for changes: new incidents, revised victim counts, hospital capacity reductions, route delays, and traffic changes. It should summarize what changed and why it matters. It should distinguish facts from recommendations.
 
+![Red update card and rail NEW badges marking new information](assets/screenshots/update-indicator.png)
+
 ## Scenario Facilitator
 
 A scenario facilitator helps humans understand the current exercise. It can explain the starting state, scheduled update semantics, scenario goals, and how to use the UI. It should not spoil future timed events unless explicitly asked.

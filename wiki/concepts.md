@@ -56,6 +56,8 @@ sequenceDiagram
 
 A Surface is the scenario-declared UI assembly. V1 supports safe primitives such as map, object rail, system footer, and scenario guidance overlay. Scenarios should not rely on hidden default UI; they declare their initial surface.
 
+![Category visibility menu on the hospitals rail section](assets/screenshots/category-visibility.png)
+
 ```mermaid
 flowchart LR
   Scenario[Scenario Definition] --> Runtime[Control Instance Runtime]

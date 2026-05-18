@@ -15,6 +15,12 @@ The word Leitbild means guiding image or model. In this project it points to an 
 
 Open the current sandbox at [leitbild.samsinn.app](https://leitbild.samsinn.app/). Choose a scenario such as Halden or Oslo. After startup, the map appears with a left rail listing hospitals, ambulances, incidents, and traffic. The scenario guidance card explains the initial task. You can dismiss it, but for a first visit it is worth reading.
 
+![Startup checklist while a scenario loads](assets/screenshots/status-modal.png)
+
+The footer gear opens a settings modal for theme, scenario selection, and reset:
+
+![Settings modal — theme, scenario, reset](assets/screenshots/settings-modal.png)
+
 To dispatch an ambulance, select an ambulance in the rail or on the map, then click an incident or hospital target. A left-pointing arrow next to an ambulance means it is outbound to an incident. A right-pointing arrow means it is inbound to a hospital. An idle ambulance has a green status dot. Dispatch enough ambulance capacity to cover the victims at an incident, then transport patients to hospitals with available trauma beds.
 
 Use the eye icons in the rail to show or hide extra data fields such as victims, trauma beds, traffic severity, and reasons. Use the question mark on an object row for a tooltip with more details. Use the settings button in the footer to switch scenarios, reset the current scenario run, or change theme.

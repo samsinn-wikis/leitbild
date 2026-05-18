@@ -29,6 +29,8 @@ Open [https://leitbild.samsinn.app/i/oslo-ambulance](https://leitbild.samsinn.ap
 
 ### Starting State
 
+![Oslo scenario overview](assets/screenshots/oslo-overview.png)
+
 Oslo starts with Oslo University Hospital, Lovisenberg Hospital, and Aker Emergency Clinic. Ambulance A-12 is available. Ambulance A-21 and Ambulance A-34 are already transporting patients to hospitals. Incidents include a resolved Storo collision, a partly handled Torshov bicycle crash, and an unattended Grønland multi-car crash. Traffic includes a Ring 2 slowdown.
 
 ### Scheduled Events
@@ -475,6 +477,8 @@ Halden is a compact scenario for checking scenario switching, routed traffic, ho
 Open [https://leitbild.samsinn.app/i/halden](https://leitbild.samsinn.app/i/halden) to create a new run, or choose Halden from the scenario picker.
 
 ### Starting State
+
+![Halden scenario overview](assets/screenshots/halden-overview.png)
 
 Halden starts with Halden Emergency Clinic, Østfold Hospital Kalnes, three ambulances, two incidents, and a downtown traffic slowdown. One ambulance is already transporting a patient toward a hospital. The bridge road collision has two confirmed victims, while the harbor fall injury begins with an estimated victim count.
 

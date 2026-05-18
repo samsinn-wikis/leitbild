@@ -35,9 +35,13 @@ Trauma beds are shown as available over total, for example `3 / 4`. A hospital w
 
 ## Incidents And Victims
 
-Victim counts can be known, estimated, or unknown. Scenario scripts may reveal new information over time. A red `new` badge on an incident or hospital indicates noteworthy updated information. Ambulance movement updates are not considered noteworthy and should not produce `new` badges.
+Victim counts can be known, estimated, or unknown. Scenario scripts may reveal new information over time. A red `new` badge on an incident or hospital indicates noteworthy updated information.
+
+![Update card and rail NEW badges signalling new incident information](../assets/screenshots/update-indicator.png) Ambulance movement updates are not considered noteworthy and should not produce `new` badges.
 
 ## Ambulance Routing
+
+![Ambulance routed to a red bridge collision incident](../assets/screenshots/dispatch-route.png)
 
 Ambulance routes are road-shaped when routing is available. Route progress and ETA are derived from the planned route and the ambulance motion model. Traffic conditions may affect route interpretation, but automatic rerouting is not yet a general policy.
 
