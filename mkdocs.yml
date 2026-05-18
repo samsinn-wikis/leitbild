@@ -72,7 +72,6 @@ nav:
     - Oslo Ambulance: scenarios/oslo-ambulance.md
     - Halden: scenarios/halden.md
   - Concepts: concepts.md
-  - Future projects: future-projects.md
   - Domains:
     - Ambulance: domains/ambulance.md
     - Traffic: domains/traffic.md
@@ -94,3 +93,4 @@ nav:
     - Scenario Script Runtime: adrs/0013-scenario-script-runtime.md
     - Scenario Surface Definitions: adrs/0014-scenario-surface-definitions.md
   - Source map: source-map.md
+  - Future projects: future-projects.md
