@@ -1,0 +1,77 @@
+site_name: "Leitbild Wiki"
+site_description: "LLM-readable operational knowledge base, tutorial, and specification hub for Leitbild"
+site_url: "https://samsinn-wikis.github.io/leitbild/"
+docs_dir: wiki
+repo_url: "https://github.com/samsinn-wikis/leitbild"
+repo_name: "samsinn-wikis/leitbild"
+edit_uri: edit/main/wiki/
+
+theme:
+  name: material
+  custom_dir: overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.action.edit
+    - toc.integrate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - roamlinks
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+
+extra:
+  wiki_version: "0.1.0"
+  feedback_issue_url: "https://github.com/samsinn-wikis/leitbild/issues/new"
+
+nav:
+  - Home: index.md
+  - Start here: start-here.md
+  - Tutorials: tutorials.md
+  - Scenarios: scenarios.md
+  - Concepts: concepts.md
+  - Domains:
+    - Ambulance: domains/ambulance.md
+    - Traffic: domains/traffic.md
+  - Agent guides: agent-guides.md
+  - Specs: specs.md
+  - Source map: source-map.md

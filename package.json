@@ -1,0 +1,12 @@
+{
+  "name": "leitbild-wiki",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "bun run scripts/wiki-check.ts",
+    "build": "mkdocs build"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  }
+}

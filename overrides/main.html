@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+<meta name="wiki-version" content="{{ config.extra.wiki_version }}">
+<style>
+  .feedback-icon {
+    opacity: 0;
+    transition: opacity 0.15s;
+    cursor: pointer;
+    margin-left: 0.45em;
+    font-size: 0.75em;
+    vertical-align: middle;
+    text-decoration: none;
+    user-select: none;
+    line-height: 1;
+  }
+  h2:hover > .feedback-icon,
+  h3:hover > .feedback-icon,
+  .md-content__inner p:hover > .feedback-icon,
+  .md-content__inner li:hover > .feedback-icon,
+  .md-content__inner blockquote:hover > .feedback-icon {
+    opacity: 0.45;
+  }
+  .feedback-icon:hover,
+  .feedback-icon:focus {
+    opacity: 1 !important;
+    outline: none;
+  }
+  .feedback-icon-block {
+    float: right;
+    margin-left: 0.8em;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{{ super() }}
+<script>
+(function() {
+  var issueBase = '{{ config.extra.feedback_issue_url }}';
+
+  function nearestSectionId(el) {
+    var cur = el;
+    while (cur && cur.previousElementSibling) {
+      cur = cur.previousElementSibling;
+      if (cur.id && /^H[1-3]$/.test(cur.tagName)) return { id: cur.id, label: cur.textContent.replace('💬','').trim() };
+    }
+    if (el.parentElement && el.parentElement !== document.body) return nearestSectionId(el.parentElement);
+    var h1 = document.querySelector('article h1');
+    return h1 ? { id: h1.id || '', label: h1.textContent.replace('¶','').trim() } : { id: '', label: document.title };
+  }
+
+  function pageMarkdownPath() {
+    var path = window.location.pathname.replace(/^\/leitbild\/?/, '').replace(/\/$/, '');
+    if (!path) return 'index.md';
+    return path + '.md';
+  }
+
+  function issueUrl(sectionId, sectionLabel, excerpt, kind) {
+    var title = '[Feedback] ' + document.title.replace(' - Leitbild Wiki', '') + (sectionLabel ? ' / ' + sectionLabel : '');
+    var body = [
+      'Page: ' + window.location.href,
+      'Source: `wiki/' + pageMarkdownPath() + '`',
+      sectionId ? 'Section: #' + sectionId : '',
+      excerpt ? 'Excerpt: > ' + excerpt.replace(/\n/g, ' ').slice(0, 500) : '',
+      '',
+      'Feedback type: ' + (kind || 'paragraph'),
+      '',
+      'Suggestion / bug report / improvement:',
+      ''
+    ].filter(Boolean).join('\n');
+    return issueBase + '?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body) + '&labels=' + encodeURIComponent('wiki-feedback');
+  }
+
+  function makeIcon(targetEl, blockKind) {
+    var icon = document.createElement('a');
+    icon.className = 'feedback-icon' + (blockKind ? ' feedback-icon-block' : '');
+    icon.textContent = '💬';
+    icon.title = 'Suggest a change for this' + (blockKind ? ' ' + blockKind : ' section');
+    icon.href = '#';
+    icon.setAttribute('aria-label', icon.title);
+    icon.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var anchor = nearestSectionId(targetEl);
+      var excerpt = '';
+      if (blockKind) {
+        excerpt = targetEl.textContent.replace('💬', '').trim();
+        if (excerpt.length > 240) excerpt = excerpt.slice(0, 240) + '…';
+      }
+      window.open(issueUrl(anchor.id, anchor.label, excerpt, blockKind || 'section'), '_blank', 'noopener');
+    });
+    targetEl.appendChild(icon);
+  }
+
+  document.querySelectorAll('article h2[id], article h3[id]').forEach(function(h) { makeIcon(h, 'section'); });
+  var blockSel = '.md-content__inner > p, .md-content__inner > ul > li, .md-content__inner > ol > li, .md-content__inner > blockquote, .md-content__inner .admonition > p';
+  document.querySelectorAll(blockSel).forEach(function(el) {
+    if (el.closest('.md-nav, .md-footer, .md-source-file, .toc')) return;
+    if (el.querySelector('.feedback-icon')) return;
+    var kind = el.tagName === 'LI' ? 'item' : (el.tagName === 'BLOCKQUOTE' ? 'note' : 'paragraph');
+    makeIcon(el, kind);
+  });
+})();
+</script>
+{% endblock %}
