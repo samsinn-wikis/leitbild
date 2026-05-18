@@ -91,7 +91,7 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
       "type": "incident",
       "id": "incident:halden-harbor",
       "label": "Harbor fall injury",
-      "position": [11.3832, 59.1168],
+      "position": [11.3775431, 59.1183212],
       "triage": "yellow",
       "victims": { "state": "estimated", "count": 1 }
     },
