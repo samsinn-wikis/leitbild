@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "bun run scripts/wiki-check.ts",
+    "sync:leitbild": "bun run scripts/sync-leitbild-sources.ts",
     "build": "mkdocs build"
   },
   "devDependencies": {

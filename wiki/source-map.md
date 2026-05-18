@@ -16,7 +16,11 @@ The executable scenario configs currently live in the Leitbild repo:
 - `src/scenarios/oslo-ambulance.scenario.json`
 - `src/scenarios/halden.scenario.json`
 
-The copies in [[scenarios]] are mirrored for humans and AI agents. If the code repo changes, the wiki copies should be updated by automation or explicit sync.
+The copies in [[scenarios]], [[scenarios/oslo-ambulance]], and [[scenarios/halden]] are mirrored for humans and AI agents. Run `bun run sync:leitbild` in the wiki repo after scenario JSON changes.
+
+## ADR Source Files
+
+Architecture decision records live in `docs/adr` in the Leitbild repo and are mirrored as separate pages under the wiki `adrs/` directory. Run `bun run sync:leitbild` in the wiki repo after ADR changes.
 
 ## Pack Source Files
 
@@ -36,6 +40,6 @@ This wiki was first generated from the Leitbild project documentation, current s
 
 ## Screenshot Sources
 
-Screenshot slots are reserved in `wiki/assets/screenshots`. The first dispatch could not capture screenshots because the available Playwright browser backend was closed in the current Codex session. Screenshots can be supplied manually or captured in a later session.
+Screenshots live in `wiki/assets/screenshots` and are captured from the production Leitbild app. They illustrate scenario overviews, dispatch routing, settings, startup status, category visibility, and update indicators.
 
 Related pages: [[index]], [[concepts]], [[specs]], [[scenarios]].

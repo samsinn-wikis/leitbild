@@ -90,7 +90,7 @@ const main = async (): Promise<void> => {
         }
       }
     }
-    if (!infra.has(name) && content.replace(/^---\n[\s\S]*?\n---/, '').trim().split(/\s+/).length < 120) {
+    if (fm.type !== 'adr' && !infra.has(name) && content.replace(/^---\n[\s\S]*?\n---/, '').trim().split(/\s+/).length < 120) {
       issues.push({ severity: 'warning', category: 'SPARSE', message: `${rel}: short page; check if intentional` })
     }
   }
