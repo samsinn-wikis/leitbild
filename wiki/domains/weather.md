@@ -129,6 +129,285 @@ The widest reasonable weather pack scope includes:
 
 The first implementation does not need all of this. The scope is deliberately broad so that early choices do not block aviation, maritime, wildfire, traffic, drone, or process-control scenarios later.
 
+## V1 Implementation Recommendation
+
+The recommended v1 is a native TypeScript weather pack with a RoadSurf-inspired ground-condition model, scenario-authored weather evolution, MapLibre weather layers, and route-impact projections that other packs can consume. It should not attempt to run a full meteorological model. It should not integrate WRF, pySTEPS, Open-Meteo, or RoadSurf as runtime dependencies in the first pass. Those systems are useful references and future integration paths, but v1 should be deterministic, scenario-controlled, dependency-light, testable, and tightly aligned with the current Leitbild pack architecture.
+
+The design center for v1 is winter road operations. This gives the pack immediate operational value for ambulance, traffic, logistics, and emergency-response scenarios while still laying a foundation for aviation, maritime, drone, and wildfire use cases. A scenario should be able to say that rain starts, ground temperature falls below freezing, untreated roads develop black ice risk, snow accumulates, visibility drops, a snowplow clears a route, and route speeds or ETAs change because of those environmental conditions. That is a credible and useful simulation even without high-fidelity weather forecasting.
+
+The pack should publish environmental projections rather than secretly mutating other domains. Weather owns atmospheric and ground-condition state. Traffic, ambulance, drone, aviation, hospital, logistics, and other packs decide how to consume that state. This preserves the same architectural rule used elsewhere in Leitbild: packs own their internals; Leitbild coordinates commands, events, signals, projections, snapshots, and surfaces.
+
+## V1 Capability Set
+
+V1 should support scenario-authored weather zones, weather patterns, and road-condition effects. A weather zone is a spatial area with atmospheric properties such as air temperature, ground temperature, precipitation, visibility, and wind. A weather pattern is a zone or band that changes over time: it can start, stop, move, intensify, weaken, or change precipitation type. A road-condition effect is the operational projection that other packs actually care about: wetness, snow, ice, black ice risk, friction class, speed factor, treatment state, and confidence.
+
+The minimum atmospheric values for v1 should be air temperature, ground temperature, precipitation type, precipitation intensity, visibility, wind direction, and wind speed. These are enough to support rain, snow, freezing rain, fog, wind, and basic forecast products. Cloud layers, turbulence, icing layers aloft, and aviation-specific ceiling concepts should be represented in the scope and schema direction, but they do not need full simulation behavior in v1.
+
+The minimum ground-condition values for v1 should be surface temperature, water accumulation, snow accumulation, ice accumulation, black ice risk, friction class, treatment state, and speed factor. These values should be understandable to humans and AI agents. "Slippery" should not be a mysterious label; it should be explainable as a consequence of wetness, ice, snow, surface temperature, and treatment.
+
+The minimum intervention set should be plowed, salted, gritted, cleared, and closed. A snowplow or road-treatment action should reduce snow, ice, or friction penalty along a route or area, with an effect that can decay over time. This is important because weather should not be a one-way global modifier. Operations can change environmental consequences.
+
+The minimum forecast support should be scenario-authored forecast products. V1 does not need to compute forecasts from meteorology. It should let a scenario publish forecast information with valid time, confidence, affected area, hazards, and summary. This allows studies where users must anticipate a cold front, fog bank, or snowfall before the ground condition has fully materialized.
+
+## Core Algorithms And Mathematical Approach
+
+V1 should use simple deterministic update equations, not complex meteorology. The core simulation loop advances on the Leitbild control-instance clock. On each weather update, the pack evaluates active scenario patterns, projects current atmospheric forcing into affected spatial areas, updates ground-condition state for affected road or area cells, applies interventions such as plowing or salting, and publishes changed projections.
+
+For pattern movement, v1 can use linear interpolation over time. A precipitation band can move from one geometry to another over a configured duration. A fog polygon can expand, contract, or translate. An intensity curve can interpolate from light rain to heavy rain. This is enough to create a credible cold-front or snow-band scenario without implementing numerical weather prediction.
+
+For accumulation, v1 can use mass-balance style storage variables. A road-condition state has water, snow, and ice storage. Rain increases water. Snow increases snow. If ground temperature is below freezing, water gradually converts to ice. If surface temperature is above freezing, snow and ice melt into water and then drain or evaporate slowly. Treatment can reduce snow or ice storage and improve friction. These equations can be deliberately simple but still causally structured.
+
+A plausible road-state update can be described as:
+
+```text
+water += rainRate * dt
+snow += snowRate * dt
+if groundTemperature < 0:
+  ice += freezeRate(water, groundTemperature) * dt
+  water -= frozenAmount
+if groundTemperature > 0:
+  melt = meltRate(snow, ice, groundTemperature) * dt
+  snow -= snowMelt
+  ice -= iceMelt
+  water += melt
+water -= drainageRate(water, roadClass, slope) * dt
+snow -= plowEffect * treatmentEffectiveness
+ice -= saltEffect * treatmentEffectiveness
+friction = deriveFriction(water, snow, ice, blackIceRisk, treatment)
+speedFactor = deriveSpeedFactor(friction, visibility, roadClass)
+```
+
+The formulas should be transparent rather than overly calibrated. The first goal is directional correctness: sustained rain makes roads wet, freezing wet roads become icy, snow accumulates, treatment improves conditions, and untreated roads remain worse than treated roads. A later version can replace these functions with RoadSurf-inspired or RoadSurf-backed physics.
+
+For black ice risk, v1 can use a bounded risk score from 0 to 1. It should increase when water is present, ground temperature is below freezing, precipitation or melting has recently occurred, and road exposure is high. It should decrease with treatment, warming, drying, and time. Black ice risk should be a risk signal, not a binary truth, unless a scenario explicitly marks it as observed.
+
+For spatial matching, v1 should use geometry intersection rather than requiring stable road IDs from day one. Weather zones and road-condition routes have geometries. Active route geometries can be sampled against those geometries to estimate affected distance. The affected-distance fraction and condition severity produce route speed penalties and warnings. This avoids blocking on perfect OSM segment identity while preserving a path to stable OSM-derived road segment IDs in v2.
+
+For routing impact, v1 should separate ETA adjustment from route recomputation. The first version can calculate normal routes, sample the route against active weather conditions, compute a weather-adjusted ETA, and show route-impact explanations. Rerouting around weather should be an explicit command or policy, not a hidden automatic side effect. V2 can feed dynamic edge penalties into the routing engine so the chosen route itself avoids icy or closed segments.
+
+## Data And Projection Model
+
+The weather pack needs internal state and published projections. Internal state can be optimized for simulation. Published projections should be stable, typed, and useful to other packs.
+
+The core published concepts are:
+
+- weather pattern: named atmospheric event with current geometry, intensity, movement, and time state;
+- ground condition: road, route, area, or field condition with wetness, snow, ice, friction, speed factor, and treatment;
+- weather signal: point or area facts such as visibility, wind, temperature, and hazard status;
+- forecast product: scenario-authored statement about expected future conditions, confidence, valid time, and hazards;
+- weather event: meaningful changes such as freezing rain started, road became icy, route treated, visibility below threshold, or forecast updated.
+
+A road-condition projection should be explicit enough for both UI and routing:
+
+```ts
+interface RoadConditionProjection {
+  id: string;
+  sourcePackId: "weather";
+  geometry: LineString | MultiLineString;
+  validFrom: string;
+  validUntil?: string;
+  condition: {
+    surfaceTemperatureC?: number;
+    waterMm?: number;
+    snowMm?: number;
+    iceMm?: number;
+    blackIceRisk?: number;
+    frictionClass: "normal" | "wet" | "slippery" | "icy" | "blocked";
+    speedFactor: number;
+    treatment?: "none" | "plowed" | "salted" | "gritted" | "plowed-and-salted";
+    confidence: number;
+  };
+  provenance: {
+    kind: "scenario" | "forecast" | "observed" | "inferred" | "intervention";
+    sourceId?: string;
+  };
+}
+```
+
+The internal model should store only active conditions, not every road in the map. A weather pack should not precompute a road state for all of Oslo every tick. Instead, it should maintain states for scenario-declared zones, active road-condition geometries, recently sampled routes, and treatment routes. This keeps memory and CPU bounded and makes the model credible on a small Hetzner instance.
+
+## Scenario Authoring Plan
+
+Scenario authoring is central. The weather pack should be powerful because scenarios can parameterize it, not because users need to code weather behavior manually. A weather scenario block should support initial conditions, named patterns, ground rules, forecast products, and interventions.
+
+Example:
+
+```json
+{
+  "weather": {
+    "initial": {
+      "airTemperatureC": 1,
+      "groundTemperatureC": -2,
+      "visibilityM": 9000,
+      "wind": { "directionDeg": 240, "speedMps": 6 }
+    },
+    "patterns": [
+      {
+        "id": "freezing-rain-front",
+        "label": "Freezing rain front",
+        "kind": "precipitationBand",
+        "startsAt": "T+120s",
+        "durationSeconds": 1200,
+        "movement": {
+          "fromLine": {
+            "start": { "lon": 10.65, "lat": 59.95 },
+            "end": { "lon": 10.90, "lat": 59.95 }
+          },
+          "toLine": {
+            "start": { "lon": 10.85, "lat": 59.95 },
+            "end": { "lon": 11.10, "lat": 59.95 }
+          }
+        },
+        "precipitation": {
+          "type": "rain",
+          "intensityMmPerHour": 4
+        },
+        "temperatureTrend": {
+          "airTemperatureC": { "from": 1, "to": -3 },
+          "groundTemperatureC": { "from": -1, "to": -4 }
+        },
+        "visibilityM": { "from": 8000, "to": 1500 }
+      }
+    ],
+    "forecasts": [
+      {
+        "issuedAt": "T+0s",
+        "validFrom": "T+600s",
+        "summary": "Freezing rain likely west of Ring 2 after T+10.",
+        "confidence": 0.7,
+        "hazards": ["black-ice", "low-visibility"]
+      }
+    ]
+  }
+}
+```
+
+Interventions should also be scenario-scriptable and commandable. A snowplow action might target a drawn route, an OSM-derived road segment group, or a polygon. The result should be a ground-condition modification with known effectiveness and decay:
+
+```json
+{
+  "type": "weather.applyRoadTreatment",
+  "target": { "routeId": "plow-route-ring-2" },
+  "treatment": {
+    "kind": "plowed-and-salted",
+    "effectiveness": 0.75,
+    "decayMinutes": 45
+  }
+}
+```
+
+The authoring model should avoid arbitrary expressions in v1. Rules such as "rain on subzero ground increases black ice risk" should be built into named rule presets, not authored as unvalidated code. This keeps scenario JSON readable and AI-authorable.
+
+## Map And Routing Extensions
+
+The map system needs weather layers and route-impact sampling. MapLibre can render the v1 requirements using normal sources and layers: filled polygons for weather zones, line layers for affected roads, symbol or line patterns for wind and treatment, and popups or side panels for inspection. V1 should avoid custom WebGL or canvas layers unless MapLibre layers are clearly insufficient.
+
+The key technical extension is a route-condition sampler. Given a route geometry and the set of active road-condition projections, it calculates which portions of the route overlap wet, snowy, icy, blocked, or treated conditions. It then returns affected distance, worst hazard, aggregate speed factor, explanation strings, and visual segments. This sampler should be reusable by the ambulance pack, traffic pack, logistics pack, and future drone/vehicle packs.
+
+For v1, routing can remain conservative:
+
+1. calculate route normally;
+2. sample route against active weather conditions;
+3. adjust ETA and display route warnings;
+4. let the user or AI agent request reroute if needed.
+
+For v2, the router should accept dynamic edge penalties so routes can avoid weather-affected segments automatically when policy permits. That requires more stable road identity than geometry overlap alone. A future vector-tile or routing preprocessing step should generate stable road segment IDs from OSM-derived data so weather, traffic, routing, and plow actions can all refer to the same road entities.
+
+## UI Concept
+
+The v1 weather UI should make conditions legible without overwhelming the map. The map should support toggles for weather zones, ground conditions, treated routes, and forecast. Weather zones should be translucent and calm. Road conditions should use road-following line overlays: blue for wet, white/light blue for snow, amber for slippery risk, red for icy/blocked, and green or blue-green for treated routes. The style should be professional and operational, not decorative.
+
+The left rail or settings surface should include a Weather category when the active scenario includes the weather pack. It should list active weather patterns, forecast products, and major ground-condition hazards. A row might say "Freezing rain front," "Black ice risk west of Ring 2," or "Plowed route active: Aker to Ullevaal." The row should expose details on hover or click: valid time, confidence, affected area, expected impacts, and source.
+
+The map should provide inspection at three levels. Clicking a weather zone shows atmospheric state and forecast. Clicking an affected road shows ground condition, treatment state, friction class, speed factor, and explanation. Selecting an ambulance route should show route impact: affected distance, ETA penalty, worst condition, and whether rerouting is recommended.
+
+The scenario guidance overlay should be able to explain weather as part of a tutorial: "Freezing rain begins in two minutes; untreated roads will become icy. Dispatch enough ambulances before the route degrades, or inspect the weather layer to plan safer routing." This is important because the pack is not just a visual feature; it is a research and training variable.
+
+The settings modal should eventually let users toggle weather layers and choose whether forecast, current, or facilitator truth is shown. The first implementation can keep this simpler: layer visibility controls and a current/forecast toggle are enough. Role-specific hidden truth should wait until we have richer role support.
+
+## Technical UI Implementation Plan
+
+The UI implementation should use the existing MapLibre-first rendering doctrine. Weather zones, affected roads, treated routes, and forecast geometries should be native MapLibre GeoJSON sources and layers. Rich explanatory UI should remain in Svelte: rail rows, hover cards, route-impact panels, and scenario guidance.
+
+The map source plan should be:
+
+- `weather-zones-source`: polygons for precipitation, fog, wind/storm, and forecast areas;
+- `weather-road-conditions-source`: line features for wet, snowy, icy, blocked, or treated roads;
+- `weather-point-observations-source`: optional sensor/report points;
+- `weather-route-impact-source`: route segments affected for the selected asset.
+
+Layer ordering should put weather zones above the base map but below operational objects, and road-condition lines above road labels only when necessary. Routes and selected object halos must remain readable. Forecast layers should use dashed or lower-opacity styling so users do not confuse forecast with current conditions.
+
+The rail presenter should receive weather category metadata from the pack presentation layer, not hardcoded weather UI. Weather field visibility should reuse the category visibility system where possible: users can toggle active pattern, precipitation, visibility, road condition, treatment, and forecast. This keeps the implementation aligned with the existing pack-driven surface model.
+
+The route-impact UI should be built as a reusable component, not ambulance-specific. It should accept a selected route, active route impacts, and an object label. It should display "weather impact," "traffic impact," and later other constraints in a consistent way. This avoids hardcoding winter-road semantics into ambulance cards.
+
+## Hetzner Feasibility And Performance
+
+This v1 is credible on the current Hetzner deployment because it is not a full weather model. It is a sparse, scenario-driven environmental state engine. It updates only active weather patterns, affected geometries, active routes, and relevant treatment states. It does not compute every road in Norway, every map tile, or every weather grid cell.
+
+The computational cost is mainly geometry and small-state updates. A typical sandbox scenario might have fewer than ten weather patterns, tens of road-condition features, and a small number of active routes. Updating storage variables for those features once per second or once every few seconds is trivial compared with vector tile serving and normal web traffic. The expensive part is route/geometry overlap if implemented carelessly, but this can be optimized.
+
+The first optimization is cadence. Weather state does not need to update at animation frame rate. A one-second or five-second simulation cadence is enough for most operational scenarios. UI animation can interpolate moving weather polygons visually if needed, but simulation truth should update on controlled ticks.
+
+The second optimization is dirty sets. Only active patterns, recently changed road conditions, selected routes, and routes belonging to moving assets need recalculation. If a snow band is stationary or a route does not intersect any weather zone, there is nothing to recompute.
+
+The third optimization is spatial indexing. V1 can start with bounding-box prefilters before doing line/polygon intersections. V2 can add a small grid or R-tree index over active condition geometries. Since the active weather features are sparse, even simple bounding-box checks are likely enough for early scenarios.
+
+The fourth optimization is projection compression. The weather pack should publish aggregate road-condition geometries rather than many tiny segment updates when possible. If an entire route is icy, one line feature is better than hundreds of micro-features. Detailed road segment identity can come later when dynamic routing needs it.
+
+The fifth optimization is route-impact caching. A route impact is valid until the route changes or relevant weather condition changes. We should cache impact results by route id and weather revision. This avoids resampling every asset route on every UI update.
+
+On a modest Hetzner instance, this model should comfortably support dozens of active weather features, dozens of active routes, and hundreds of operational objects. If we later simulate thousands of route segments or city-wide road states, we should move to stable road segment IDs, spatial indexes, coarser update cadence, and aggregate projections. Nothing in v1 should prevent that.
+
+## Implementation Phases
+
+Phase 1 should define the weather domain schema and pack boundary. Add weather scenario config validation, domain types for atmospheric condition, ground condition, weather pattern, forecast product, road treatment, and road-condition projection. The pack should load scenario-authored weather state and publish static weather zones before any evolution is added.
+
+Phase 2 should add deterministic evolution. Implement moving/intensifying patterns, simple precipitation accumulation, temperature trends, wetness/snow/ice storage updates, black ice risk, and treatment decay. Add tests for freezing rain, snow accumulation, melting, and plowing.
+
+Phase 3 should add map rendering. Add MapLibre layers for current weather zones, road conditions, treated routes, and forecast areas. Add rail presentation for active weather patterns and hazards. Add inspection popups or Svelte overlays for condition details.
+
+Phase 4 should add route-impact sampling. Given a route geometry and active road-condition projections, compute affected distance, speed factor, ETA penalty, and explanations. Display this for selected ambulance/logistics routes. Keep actual rerouting manual or explicit.
+
+Phase 5 should add cross-pack consumption. The traffic pack should consume road-condition projections and publish route impact or speed penalties. The ambulance pack should display weather-adjusted ETA and warning state without directly owning weather rules.
+
+Phase 6 should add scenario authoring examples. Add one winter-road scenario where freezing rain creates black ice and a treatment route improves selected roads. Add one fog/visibility scenario as a stepping stone toward aviation and drone use.
+
+Phase 7 should add v2 preparation: stable road segment IDs, forecast timeline controls, optional external forecast ingestion, and richer field projections.
+
+## Critical And Blocking Questions
+
+Several decisions should be resolved before implementation begins. The first is road identity. V1 can use geometry overlap, but if we want reliable long-lived road conditions, plow routes, and dynamic rerouting, we eventually need stable road segment IDs. The blocking question is whether v1 should accept geometry-only matching or spend early effort deriving road segment identity from OSM/vector tile data.
+
+The second question is routing behavior. Should v1 only adjust ETA and show route warnings, or should it also change selected routes automatically? The safer initial answer is ETA adjustment and explicit reroute. Automatic weather-aware routing is powerful, but it can hide behavior and create confusing changes unless policy and UI are very clear.
+
+The third question is scenario grammar. Weather evolution should be powerful enough for authored scenarios but not become arbitrary code. We need to decide the first set of named pattern kinds and rule presets: precipitation band, fog area, cold front, snow shower, freezing rain, wind episode, road treatment. Adding too many pattern types before implementation could create bloat.
+
+The fourth question is how detailed ground physics should be. A RoadSurf-inspired model is credible, but a too-detailed surface-energy model would slow development and be hard to explain. The v1 target should be directional, explainable, and testable rather than calibrated.
+
+The fifth question is UI density. Weather layers can easily clutter the map. We should decide which layers are visible by default in ambulance scenarios. A likely default is current road condition and active warnings, with precipitation/forecast/treatment available through toggles.
+
+The sixth question is persistence. Ground-condition accumulations and treatment state must survive reload and snapshot restore. That means weather pack state cannot be purely derived from scenario start every time. The control-instance snapshot needs enough weather state to restore current truth.
+
+## Adversarial Review Of The V1 Plan
+
+The main correctness risk is pretending that a simplified road-weather model is a weather forecast. The mitigation is language and UI discipline: v1 is scenario-driven operational weather, not numerical weather prediction. Forecast products are authored scenario artifacts, not computed meteorology.
+
+The main architecture risk is letting weather directly mutate traffic, ambulance, or route state. The mitigation is projection-based interaction. Weather publishes ground conditions and signals; traffic/routing samples them; ambulance displays the resulting impact. This keeps cross-pack behavior inspectable.
+
+The main performance risk is trying to maintain state for every road segment in the map. The mitigation is sparse active state, dirty sets, cadence control, bounding-box prefilters, route-impact caching, and aggregate geometries. V1 should simulate only scenario-relevant weather and route conditions.
+
+The main UI risk is visual clutter. The mitigation is layer toggles, restrained styling, current-vs-forecast distinction, and inspection-first interaction. Weather should explain operational consequences, not paint the map with decorative noise.
+
+The main scope risk is trying to support roads, aviation, drones, maritime, wildfire, and forecasts equally in v1. The mitigation is to make v1 road-weather-first while preserving schema concepts for atmospheric layers, forecast products, and fields. Aviation and drones can use basic visibility/wind in v1, but full vertical weather structure belongs later.
+
+The main data-model risk is choosing only polygons or only grids too early. The mitigation is a hybrid projection model: polygons for zones, lines for road conditions and treatment, points for observations, and future fields for continuous values. This matches the different shapes of weather information without forcing everything into one representation.
+
+The main testability risk is stochastic or hidden behavior. The mitigation is deterministic clock-driven updates, explicit scenario inputs, no external network dependency, and tests for each physical rule: accumulation, freezing, melting, treatment, route impact, forecast display, and snapshot restore.
+
+The revised conclusion after this review is unchanged but sharper: implement v1 as a deterministic, scenario-driven, sparse, TypeScript weather pack focused on ground-condition and route-impact simulation, with atmospheric and forecast concepts included as structured scenario data. Defer external weather models, real forecast ingestion, full grids, and automatic weather-aware rerouting until the projection and UI foundations are proven.
+
 ## Open Questions
 
 The next design step should decide how much of this belongs in the first weather pack. The main questions are:
