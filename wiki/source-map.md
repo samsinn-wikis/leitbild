@@ -40,10 +40,12 @@ This wiki was first generated from the Leitbild project documentation, current s
 
 ## Future Project Sources
 
-The NPP process control pack concept in [[future-projects]] is a forward-looking design note. It is informed by the Leitbild pack/surface/event architecture and by the public [PWR Operations wiki](https://samsinn-wikis.github.io/pwr-ops/), especially its organization of Westinghouse-style PWR operating knowledge, procedure markdown, procedure families, and Samsinn integration notes. It is not an executable plant model or a licensing-grade engineering analysis.
+The advanced simulation report in [[simulation-technologies]] is a forward-looking technical survey and roadmap. It combines Leitbild's current pack/provider architecture with public references such as SUMO, MATSim, PX4, Gazebo, WRF, FARSITE, RELAP5, MOOSE, FMI, BlueSky, SimPy, and related open-source or public simulation systems.
+
+The NPP process control pack concept in [[future-projects]] is a forward-looking design note. It is informed by the Leitbild pack/surface/event architecture, [[simulation-technologies]], and by the public [PWR Operations wiki](https://samsinn-wikis.github.io/pwr-ops/), especially its organization of Westinghouse-style PWR operating knowledge, procedure markdown, procedure families, and Samsinn integration notes. It is not an executable plant model or a licensing-grade engineering analysis.
 
 ## Screenshot Sources
 
 Screenshots live in `wiki/assets/screenshots` and are captured from the production Leitbild app. They illustrate scenario overviews, dispatch routing, settings, startup status, category visibility, and update indicators.
 
-Related pages: [[index]], [[concepts]], [[specs]], [[scenarios]], [[future-projects]].
+Related pages: [[index]], [[concepts]], [[specs]], [[scenarios]], [[simulation-technologies]], [[future-projects]].

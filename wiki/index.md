@@ -15,7 +15,7 @@ This wiki covers the concepts, tutorials, domain rules, scenario descriptions, a
 
 ## Recommended Reading
 
-For humans, start with [[start-here]], then [[tutorials]], then [[scenarios]]. For AI agents, start with [[agent-guides]], [[domains/ambulance|ambulance domain rules]], [[concepts]], and [[specs]]. For longer-range architecture ideas, see [[future-projects]], including the proposed NPP process control pack. The [[source-map]] explains where each part of the wiki comes from.
+For humans, start with [[start-here]], then [[tutorials]], then [[scenarios]]. For AI agents, start with [[agent-guides]], [[domains/ambulance|ambulance domain rules]], [[concepts]], and [[specs]]. For longer-range architecture ideas, see [[simulation-technologies]] and [[future-projects]], including the proposed NPP process control pack. The [[source-map]] explains where each part of the wiki comes from.
 
 ## Current Demo Scenarios
 
