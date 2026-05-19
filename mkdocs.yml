@@ -75,6 +75,7 @@ nav:
   - Domains:
     - Ambulance: domains/ambulance.md
     - Traffic: domains/traffic.md
+    - Weather: domains/weather.md
   - Agent guides: agent-guides.md
   - Specs: specs.md
   - ADRs:
