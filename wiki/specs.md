@@ -29,6 +29,48 @@ Object Context is perspective-bearing awareness. It can store facts, activity, r
 
 Commands are sent to a control instance and routed to the provider that accepts the command kind. Commands have lifecycle events: issued, accepted, rejected, and resulting object updates. Agents should verify command outcomes by reading command status or updated projected state.
 
+## Pack Query API Spec
+
+Pack queries are read-only questions sent to the active provider for a pack through the generic Control Instance API. The route is `POST /api/control-instances/:id/queries`; the request envelope names a `packId`, a query `kind`, and a validated `payload`.
+
+The important rule is that this is one generic surface, not a new endpoint family for every pack. Weather, ambulance, traffic, and future packs use the same query envelope. The simulation hub routes the query to the provider that owns the requested pack. If the pack is not active in the current scenario run, the query fails explicitly instead of guessing or returning hidden defaults.
+
+Current query kinds include weather point, route, area, field-stat, and map-feature queries; ambulance object and dispatch-state queries; and traffic condition and route-intersection queries. Queries must not mutate the run. Commands and interaction signals remain the mutation surfaces.
+
+Request envelope:
+
+```json
+{
+  "packId": "weather",
+  "kind": "weather.sampleAtPoint",
+  "payload": {
+    "point": { "type": "Point", "coordinates": [10.75, 59.91] }
+  }
+}
+```
+
+Current weather queries:
+
+- `weather.sampleAtPoint`: sample the provider-owned sparse H3 field at a point.
+- `weather.sampleAlongRoute`: sample weather along a line route at a requested interval.
+- `weather.summarizeArea`: summarize materialized weather cells in a polygon.
+- `weather.fieldStats`: return field size and provider-side weather-field metadata.
+- `weather.mapFeatures`: project base H3 grid outlines, affected H3 cells, and influence shapes for a viewport/zoom/time into generic map features.
+
+Current ambulance queries:
+
+- `ambulance.objects`: return ambulance-domain operational objects, optionally filtered by ambulance, hospital, or incident type.
+- `ambulance.object`: return one ambulance-domain object by id.
+- `ambulance.dispatchState`: return a dispatch-oriented summary of ambulances, incidents, hospitals, assignments, and availability.
+
+Current traffic queries:
+
+- `traffic.conditions`: return traffic condition objects.
+- `traffic.condition`: return one traffic condition by id.
+- `traffic.conditionsForRoute`: return route-relevant traffic conditions that intersect or affect a route geometry.
+
+Agents should use pack queries when they need provider-owned read data. They should still use snapshots/object reads for canonical projected objects and command endpoints for changes.
+
 ## Event Model Spec
 
 Domain Events are accepted canonical changes ordered by the Control Instance runtime. The Durable Journal records meaningful history. The Live Feed broadcasts updates to connected clients. Volatile movement updates can affect snapshots without bloating the durable journal.

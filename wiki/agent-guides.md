@@ -37,6 +37,10 @@ A scenario facilitator helps humans understand the current exercise. It can expl
 
 Before calling an action endpoint, the agent should have a recent snapshot and know the target control instance. After calling, it should verify the resulting command status or object state. For multi-user runs, the agent should be cautious: a reset or delete affects other users in the same control instance.
 
+For read-only pack-owned computations, use the generic pack query API rather than guessing from visible UI. Pack queries are appropriate for weather at a point or along a route, traffic conditions intersecting a route, and ambulance dispatch summaries. Queries are read-only and should be preferred before recommendations that depend on provider-private state.
+
+Do not treat pack queries as commands. A query can reveal that a route crosses rain-affected H3 cells or traffic slowdowns; a command is still required to change an ambulance destination, reset a run, or create/delete an object.
+
 ## Uncertainty And Assumptions
 
 Use conservative language when data is estimated or unknown. For example: "The incident has an estimated two victims, so one single-capacity ambulance may be insufficient." Do not transform estimates into confirmed facts.

@@ -323,9 +323,9 @@ interface WeatherSample {
 
 `activeInfluenceIds` tells the consumer which weather objects are currently influencing the sample. If the list is empty, the sample may still be non-default because a previous weather object left persistent surface memory. That distinction is useful: "currently raining here" is different from "rain passed earlier and the surface is still wet."
 
-The current pack already contributes contextual weather fields to other categories when the weather pack is active. For example, a rail row for an ambulance, hospital, incident, or traffic condition can show weather at that object's location. A future route sampler should call the same underlying point-sampling concept along a route geometry and return affected distance, worst condition, and a concise explanation.
+The current pack already contributes contextual weather fields to other categories when the weather pack is active. For example, a rail row for an ambulance, hospital, incident, or traffic condition can show weather at that object's location.
 
-Current implementation note: the provider maintains the sparse H3 field internally, and the codebase has sparse-field point sampling support. Some UI contextual fields still use a stateless active-influence sample because the generic pack protocol does not yet expose provider-private sparse field state to presentation code. The intended direction is clear: provider-owned sparse field for canonical weather memory, explicit query surfaces for consumers, and no generic UI imports of weather internals.
+The provider-owned sparse H3 field is also exposed through Leitbild's generic pack query surface. Consumers can ask for weather at a point, weather along a route, weather summarized across an area, weather field statistics, or provider-projected map features. This is deliberately not a `/api/weather/*` endpoint family. The generic Control Instance route `POST /api/control-instances/:id/queries` routes `{ packId: "weather", kind, payload }` to the active weather provider for that run. That keeps the weather computation inside the weather pack while still making the read model available to UI, test tools, and AI agents.
 
 ## Scenario Authoring
 
@@ -412,7 +412,7 @@ Do not write derived outcome fields into weather state. Weather state should not
 
 ## Map And UI Representation
 
-The map renders weather as a projection of weather truth. The weather pack returns generic `PackMapAreaFeature` objects; the UI turns those into MapLibre GeoJSON sources and layers. The current projection has three families:
+The map renders weather as a projection of weather truth. The weather pack returns generic `PackMapAreaFeature` objects through the provider-backed `weather.mapFeatures` query; the UI turns those into MapLibre GeoJSON sources and layers. The current projection has three families:
 
 - base grid outlines for the current viewport and zoom;
 - affected H3 cells, colored by presentation severity derived from weather state;
@@ -422,7 +422,7 @@ MapLibre is a good fit because it can render GeoJSON `fill`, `line`, `symbol`, a
 
 Heatmaps are useful for point-density or fuzzy scalar fields, but they are not the canonical weather representation. The current model needs inspectable cells with state. A heatmap can become a later visualization mode for temperature, wetness, precipitation, smoke intensity, or confidence, but it should not replace the sparse H3 truth model.
 
-The UI boundary matters. Generic map code must not import weather sparse-field code, H3 directly, or weather calculators. The weather pack owns its computation and projects map features through the pack protocol. The UI owns rendering only.
+The UI boundary matters. Generic map code must not import weather sparse-field code, H3 directly, or weather calculators. The weather pack owns its computation and projects map features through the pack query protocol. The UI owns rendering only. In practical terms, the active pack contributes a `mapAreaFeatureQueries` request; the UI asks the current Control Instance to answer it; the weather provider projects the current sparse H3 field for the requested viewport, zoom, and current simulation time.
 
 ## Performance And Scaling
 
@@ -440,7 +440,7 @@ H3 also gives us a scaling path. At low zoom, parent cells can summarize child c
 
 ## Relationship To Other Packs
 
-The weather pack should interact through queries, contextual fields, map feature projections, commands, and explicit interaction signals, not through hidden mutation. Current Leitbild exposes weather as contextual fields on other objects: if the weather pack is active, the rail can show a `Weather` field for ambulances, hospitals, incidents, traffic conditions, or future asset types by sampling weather at their location.
+The weather pack should interact through pack queries, contextual fields, map feature projections, commands, and explicit interaction signals, not through hidden mutation. Current Leitbild exposes weather as contextual fields on other objects: if the weather pack is active, the rail can show a `Weather` field for ambulances, hospitals, incidents, traffic conditions, or future asset types by sampling weather at their location.
 
 A future ambulance pack might compute weather-aware ETA by sampling weather along a route. A traffic pack might reduce road speed where weather samples indicate high wetness and low visibility. A drone pack might reject missions when wind or precipitation violates vehicle limits. An AI monitor agent might watch for objects entering adverse weather and post an explanation.
 
@@ -493,7 +493,7 @@ The extension mechanism is also important. It lets us try new research variables
 
 The current model is not meteorological forecasting. It is an operational environmental simulator. It will not predict real weather unless connected to external data or a more sophisticated model. Scenario authors must therefore be honest about whether a weather object represents scenario truth, forecast, observation, or inference.
 
-The current weather query surface is not yet the final cross-pack API. Contextual fields exist, weather probes exist, and sparse-field sampling support exists internally, but AI agents and other packs should eventually get explicit API endpoints or pack query functions for point, route, and area sampling.
+The current weather query surface is intentionally small, but it is now real. AI agents and tools can use generic pack queries for point, route, area, field-stat, and map-feature reads. Future work should refine response shapes, add stronger aggregation semantics, and migrate any remaining synchronous contextual-field paths that still need provider-private sparse-field truth.
 
 Surface evolution is deliberately simple. It is useful for persistence and directional behavior, but it is not a calibrated road-surface model. For winter road studies, RoadSurf or METRo-style physics should inform future improvements.
 
@@ -503,17 +503,15 @@ The UI derives presentation severity from raw state. That is acceptable as long 
 
 ## Next Steps
 
-The most valuable next step is a route weather sampler. Given an ambulance route, traffic route, drone path, or vessel path, sample weather along the geometry and return affected distance, worst conditions, and a concise explanation. This should be reusable across ambulance, traffic, logistics, drone, aviation, and maritime packs.
+The most valuable next step is to harden route and area weather summaries. The basic `weather.sampleAlongRoute` and `weather.summarizeArea` queries exist; they should grow into concise operational explanations: affected distance, worst conditions, active influence ids, residual surface memory, confidence, and policy-neutral source data.
 
-The second step is a first-class weather query API. AI agents should be able to call "sample weather at point," "sample weather along route," and "summarize weather in area" and receive structured data with provenance and active influence ids.
+The second step is stronger use of H3 hierarchy. Parent-cell aggregation can make low-zoom weather views, dashboards, and AI summaries cheap and stable.
 
-The third step is stronger use of H3 hierarchy. Parent-cell aggregation can make low-zoom weather views, dashboards, and AI summaries cheap and stable.
+The third step is scenario authoring polish. Add examples for fog, winter road icing, heavy rain/standing water, crosswind/gusts for drones, and smoke/radiation as extensions. These examples should be small, readable, and AI-authorable.
 
-The fourth step is scenario authoring polish. Add examples for fog, winter road icing, heavy rain/standing water, crosswind/gusts for drones, and smoke/radiation as extensions. These examples should be small, readable, and AI-authorable.
+The fourth step is better physical evolution. RoadSurf-style concepts can improve surface temperature, water, ice, snow, and black ice behavior without importing a heavy meteorological runtime.
 
-The fifth step is better physical evolution. RoadSurf-style concepts can improve surface temperature, water, ice, snow, and black ice behavior without importing a heavy meteorological runtime.
-
-The sixth step is cross-pack interaction. Traffic should be able to consume weather samples for speed effects. A drone pack should consume wind/precipitation/visibility. A future fire pack should consume wind/humidity/temperature and publish smoke or fire-environment extensions.
+The fifth step is cross-pack interaction. Traffic should be able to consume weather samples for speed effects. A drone pack should consume wind/precipitation/visibility. A future fire pack should consume wind/humidity/temperature and publish smoke or fire-environment extensions.
 
 ## Reference And Further Reading
 

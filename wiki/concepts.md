@@ -23,6 +23,8 @@ A pack is the user-facing capability bundle. The ambulance pack contributes ambu
 
 A simulation provider is runtime wiring inside a pack. Providers emit object updates and signals into a Control Instance, observe committed events, and maintain any provider-private mechanics they need. Leitbild core owns event ordering and canonical shared state.
 
+Pack Queries are read-only questions routed from a Control Instance to the active provider for a pack. They exist for provider-owned read models that are not just operational objects: weather samples, H3 weather map features, traffic conditions along a route, or ambulance dispatch summaries. The API shape is deliberately generic: `POST /api/control-instances/:id/queries` with `{ packId, kind, payload }`. This lets future packs expose useful read surfaces without adding `/api/weather/*`, `/api/traffic/*`, or other domain-specific endpoint families to core.
+
 ## Operational Objects
 
 Operational Objects are the canonical things on the map and in the rail. They have identity, kind, domain, label, spatial state, operational state, tasking, alerts, provenance, timestamps, optional `domainData`, and optional `context`.
@@ -68,7 +70,10 @@ flowchart LR
   Runtime --> SimHub[Simulation Hub]
   SimHub --> Ambulance[Ambulance Provider]
   SimHub --> Traffic[Traffic Provider]
+  SimHub --> Weather[Weather Provider]
   Runtime --> API[API / Agent Access]
+  API --> Query[Pack Query Surface]
+  Query --> SimHub
 ```
 
 ## Projected State, Journal, Live Feed

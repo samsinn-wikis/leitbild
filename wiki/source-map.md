@@ -34,6 +34,8 @@ The Svelte control surface lives under `src/ui`. Map rendering uses MapLibre. Op
 
 Control-instance API routing lives under `src/core/api`. Client-side API helpers live under `src/ui/control-instance-client.ts` and route helpers live under `src/ui/control-instance-route.ts`.
 
+The generic pack query API is routed in `src/core/api/control-instance-routes.ts`, exposed to the runtime through `src/core/control-instances/runtime.ts`, and routed to active providers through `src/simulation/hub.ts`. The shared query envelope is defined in `src/core/packs/protocol.ts`. Current built-in query handlers live in `src/packs/weather/query.ts`, `src/packs/ambulance/query.ts`, and `src/packs/traffic/query.ts`.
+
 ## Generated From
 
 This wiki was first generated from the Leitbild project documentation, current scenario JSON, and architectural decisions in the application repo. It also follows patterns from `samsinn-wikis/pwr-ops` and the `michaelhil/llm-wiki-skills` project.
