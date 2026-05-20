@@ -1,3 +1,10 @@
+---
+title: H3 Spatial Field Index
+type: adr
+---
+
+> Mirrored from `docs/adr/0015-h3-spatial-field-index.md` in the Leitbild application repository. Run `bun run sync:leitbild` in this wiki repository after ADR source changes.
+
 # ADR 0015: H3 Spatial Field Index
 
 ## Status
