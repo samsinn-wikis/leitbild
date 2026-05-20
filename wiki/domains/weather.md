@@ -5,29 +5,29 @@ type: domain
 
 # Weather Domain
 
-The Leitbild weather pack represents weather as an operational environment: a changing field of conditions that humans, simulation packs, and AI agents can inspect and use. It is not just a visual overlay. Weather can make a road wet, reduce visibility around an airport, increase drone workload in gusty wind, delay vessel operations in poor visibility, raise demand for emergency response, or create a moving line of risk that a dispatcher should anticipate before it reaches the incident area.
+The Leitbild weather pack represents weather as operational environment state: a changing field of atmospheric and surface conditions that humans, simulation packs, and AI agents can inspect and use. It is not just a visual overlay. Weather can make a road wet, reduce visibility around an airport, increase drone workload in gusty wind, delay vessels in fog, raise emergency-response demand, or create a moving line of risk that a dispatcher should anticipate before it reaches an incident area.
 
-The current implementation is deliberately modest but architecturally important. Leitbild models weather through scenario-authored weather influence objects that move and change over time, a sparse hexagonal ground-truth field that stores environmental state only where it differs from global defaults, and a sampling interface that lets other packs ask: "what are the weather conditions at this point, at this time?" That gives us a real foundation for weather-aware ambulance, traffic, drone, aviation, maritime, wildfire, and process-control scenarios without turning the weather pack into a hidden global rule engine.
+The current implementation is deliberately modest but architecturally important. Weather is authored as scenario-defined influence objects, computed into a sparse H3 ground-truth field, projected into MapLibre as generic map features, and sampled by other packs through weather-at-location functions. This gives Leitbild a real foundation for ambulance, traffic, drone, aviation, maritime, wildfire, radiation, and process-control scenarios without turning the weather pack into a hidden global rule engine.
 
 ## Audience And Use
 
-This page is written for two audiences. Human readers should be able to understand what the weather pack does, why it matters, and how to reason about future extensions. AI agents should be able to use it as a compact operating reference: how to author a weather scenario, how to interpret the data model, what the canonical fields mean, and where not to invent derived state that the pack does not own.
+This page is written for human readers and AI agents. Humans should be able to understand what the weather pack does, why it matters, and where it can grow. AI agents should be able to use this page as an operating reference: how to author weather scenario objects, how to interpret H3 weather cells, what the canonical fields mean, and where not to invent derived state that the pack does not own.
 
-The page is also intentionally explicit about boundaries. Weather publishes environmental source data. It does not decide whether an ambulance may drive, whether a drone may launch, whether a ship should reroute, or whether a hospital should activate a surge plan. Those decisions belong to the consuming pack or agent. This separation matters because the same rain, fog, or ice can have different operational meaning for a heavy ambulance, a bicycle responder, a drone, an aircraft, or a ship.
+The most important boundary is simple: weather publishes environmental source data. It does not decide whether an ambulance may drive, whether a drone may launch, whether a ship should reroute, or whether a hospital should activate a surge plan. Those decisions belong to the consuming pack or agent. The same rain, fog, or ice can have different meaning for a heavy ambulance, a bicycle responder, a drone, an aircraft, or a vessel.
 
 ## Why Weather Matters In Leitbild
 
-Weather is a natural stressor for command-and-control research because it changes the world without asking the operator for permission. A clear dispatch problem becomes harder when a rain band crosses the route, visibility drops around an airport, a cold surface turns wet roads into ice, or a wildfire front accelerates because wind shifts. Weather also creates asymmetric information: a facilitator may know that snow will intensify in five minutes, a forecast may only suggest it, and an operator may discover it only when vehicles slow down.
+Weather is a natural stressor for command-and-control research because it changes the world without asking the operator for permission. A clear dispatch problem becomes harder when a rain band crosses the route, visibility drops around an airport, a cold surface turns wet roads into ice, or a wildfire front accelerates because wind shifts. Weather also creates asymmetric information: a facilitator may know that snow will intensify in five minutes, a forecast may only suggest it, and an operator may discover it only when assets slow down or a warning appears.
 
-That makes weather useful for studying anticipation, workload, automation trust, shared situation awareness, and human-AI coordination. An AI dispatch assistant can warn that a selected route enters a wet/icy field. A monitor agent can watch for assets whose missions cross a weather front. A facilitator can script a fog bank so that participants must decide whether to pre-position units before visibility collapses. A multi-user study can give one operator current conditions and another operator forecast products, then observe how they coordinate.
+That makes weather useful for studying anticipation, workload, automation trust, shared situation awareness, and human-AI coordination. An AI dispatch assistant can warn that a selected route enters a wet/icy field. A monitor agent can watch for assets whose missions cross a weather front. A facilitator can script a fog bank so that participants must decide whether to pre-position units before visibility collapses. A multi-user scenario can give one role current conditions and another role forecast products, then observe how they coordinate.
 
 Several Leitbild use cases become richer once weather is available:
 
-- Ambulance dispatch: rain reduces visibility, roads become wet, incidents increase, and available routes become more or less attractive depending on vehicle capability.
-- Traffic management: a slow traffic area can interact with wet road surfaces; a minor queue becomes a major delay when road conditions worsen.
-- Drone operations: wind speed, wind direction, precipitation, and visibility can constrain launch, endurance, sensor quality, and safe recovery.
-- Aviation or airport control: visibility, cloud cover, wind, gusts, precipitation, and surface contamination can affect runway throughput and diversion decisions.
-- Maritime control: fog, wind, precipitation, and freezing spray can affect vessel speed, harbor operations, and search-and-rescue risk.
+- Ambulance dispatch: rain reduces visibility, roads become wet, incidents increase, and route risk depends on vehicle capability.
+- Traffic management: a slow traffic area can interact with wet road surfaces; a small queue becomes a larger delay when road conditions worsen.
+- Drone operations: wind speed, wind direction, precipitation, visibility, and icing can constrain launch, endurance, sensor quality, and recovery.
+- Aviation and airport control: visibility, cloud cover, wind, gusts, precipitation, and contaminated surfaces can affect runway throughput and diversion decisions.
+- Maritime control: fog, wind, precipitation, sea spray, and freezing conditions can affect vessel speed, harbor operations, and search-and-rescue risk.
 - Wildfire response: wind, humidity, temperature, and precipitation can alter spread rate, smoke behavior, and evacuation timing.
 - Process-control simulations: external weather can stress a power plant, hospital, or industrial site through heat load, flood risk, icing, grid instability, or access-road degradation.
 
@@ -37,25 +37,23 @@ The useful research question is rarely "is it raining?" It is usually "who knows
 
 Leitbild does not try to be a numerical weather prediction system. It borrows concepts from several families of systems and deliberately chooses a lighter, more operationally legible subset.
 
-Full atmospheric models such as the Weather Research and Forecasting model (WRF) solve physical equations over three-dimensional grids. WRF is open-source public-domain code and is widely used in research and forecasting. It is powerful, but it brings Fortran-era scientific workflows, boundary-condition data, domain setup, nesting, physics schemes, and substantial compute demands. It is a reference point for future high-fidelity integration, not the right runtime dependency for a small interactive Leitbild scenario.
+Full atmospheric models such as the Weather Research and Forecasting model (WRF) solve physical equations over three-dimensional grids. WRF is open-source public-domain code and is widely used in research and forecasting. It is powerful, but it brings Fortran-era scientific workflows, boundary-condition data, nested domains, physics schemes, and substantial compute demands. It is a reference point for future high-fidelity integration, not the right runtime dependency for a small interactive Leitbild scenario.
 
-Nowcasting systems such as pySTEPS are a different inspiration. pySTEPS focuses on probabilistic short-term precipitation nowcasting, often from radar fields. Conceptually it is closer to our needs than full NWP: it treats precipitation as a moving/evolving spatial field and makes short-horizon predictions. Leitbild's moving oval weather influences are much simpler, but they use the same broad idea that weather can be represented as a field advected through time rather than as isolated point facts.
+Nowcasting systems such as pySTEPS are a closer conceptual inspiration. pySTEPS focuses on probabilistic short-term precipitation nowcasting, often from radar fields. Leitbild's moving oval weather influences are much simpler, but they use the same broad idea that operational weather can be represented as a spatial field advected and evolved through time rather than as isolated point facts.
 
-Road-weather models such as RoadSurf are especially relevant to emergency response. RoadSurf is an open-source Fortran road-weather library that models road surface temperature, water, ice, snow, and black ice using atmospheric inputs and surface energy balance. Leitbild currently uses a much simpler normalized surface state, but RoadSurf validates the core abstraction: operational road condition is a state of the surface, not just a precipitation label.
+Road-weather models such as RoadSurf are especially relevant to emergency response. RoadSurf is an open-source road-weather model library that models road surface temperature, water, ice, snow, and black ice using atmospheric inputs and surface energy balance. Leitbild currently uses a simpler normalized surface state, but RoadSurf validates the core abstraction: operational road condition is a state of the surface, not just a precipitation label.
 
-Aviation weather conventions such as METAR and TAF are useful because they show how compact, structured weather reports encode operationally relevant values: wind, visibility, present weather, cloud/sky condition, temperature, dew point, pressure, and forecast change groups. Leitbild does not encode METAR strings internally, but future aviation packs should know that these categories are established operational language.
+Aviation weather conventions such as METAR and TAF are useful because they show how compact, structured weather reports encode operationally relevant values: wind, visibility, present weather, cloud/sky condition, temperature, dew point, pressure, and forecast change groups. Leitbild does not encode METAR strings internally, but future aviation packs should understand that these categories are established operational language.
 
-Meteorological data formats such as GRIB and BUFR matter for future ingestion. GRIB is commonly used for gridded forecast fields; BUFR is used for many kinds of meteorological observations. ECMWF's ecCodes is an open-source library for encoding and decoding WMO GRIB and BUFR messages. Leitbild's v1 scenario-authored weather avoids this complexity, but a future data-ingestion pack may convert GRIB/BUFR/Open-Meteo products into Leitbild weather objects and hex-field state.
+Meteorological data formats such as GRIB and BUFR matter for future ingestion. GRIB is commonly used for gridded forecast fields; BUFR is used for many types of meteorological observations. ECMWF's ecCodes is an open-source library for encoding and decoding WMO GRIB and BUFR messages. Leitbild's v1 scenario-authored weather avoids this complexity, but a future ingestion pack may convert GRIB/BUFR/Open-Meteo products into Leitbild weather objects and H3 weather cells.
 
-Geospatial indexing systems such as H3 are a close match to Leitbild's weather field idea. H3 partitions the world into hierarchical hexagonal cells and is designed for spatial aggregation and analysis at multiple resolutions. Leitbild currently uses its own local axial hex grid, but H3 is an important future candidate if we need global, stable, multi-resolution cells that can be shared across packs, persisted, queried, and aggregated consistently.
+Game and simulation software offers another lesson: the whole world rarely updates at full fidelity every tick. Large games use grids, chunks, dirty sets, event queues, level of detail, deterministic update loops, and local activation regions. Leitbild follows the same general strategy: sparse state, deterministic ticks, scenario-authored influences, viewport rendering as projection, and explicit query surfaces for consumers.
 
-Game and simulation software offers another lesson: the whole world rarely updates at full fidelity every tick. Large games use grids, chunks, dirty sets, event queues, level of detail, deterministic update loops, and local activation regions. Weather effects may be stored as fields, particles, cellular automata, or scripted volumes. Leitbild follows the same broad strategy: sparse state, deterministic ticks, scenario-authored influences, and viewport rendering as a projection of simulation truth.
-
-Wildfire systems are a useful stress test. Cell2Fire represents landscape fire spread as a cell-based model with fuel, weather, fuel moisture, and topography per cell. ForeFire uses a C++ front-propagation/fire-spread engine and supports fire-atmosphere coupling. These systems show that fire, weather, terrain, and operations are tightly connected, and they help us think about whether future fire state should live in a separate fire grid or reuse/extensibly annotate Leitbild's environmental grid.
+Wildfire systems are a useful stress test. Cell2Fire represents landscape fire spread as a cell-based model with fuel, weather, fuel moisture, and topography per cell. ForeFire uses a C++ front-propagation/fire-spread engine and supports fire-atmosphere coupling. These systems show that fire, weather, terrain, and operations are tightly connected, and they help us think about whether future fire state should live in a separate fire grid or reuse Leitbild's shared H3 spatial index.
 
 ## Core Architectural Principle
 
-The weather pack owns environmental truth for weather. Other packs consume that truth, but they do not get to redefine it. Conversely, the weather pack must not secretly decide domain behavior for other packs. It should not tell an ambulance that it must slow down, tell a drone that it must abort, or tell a traffic provider which route to choose. It exposes source data; consumers derive operational implications according to their own capabilities, policies, and domain rules.
+The weather pack owns environmental truth for weather. Other packs consume that truth, but they do not redefine it. Conversely, the weather pack must not secretly decide domain behavior for other packs. It should not tell an ambulance that it must slow down, tell a drone that it must abort, or tell a traffic provider which route to choose. It exposes source data; consumers derive operational implications according to their own capabilities, policies, and domain rules.
 
 This gives us a clean interaction pattern:
 
@@ -63,13 +61,14 @@ This gives us a clean interaction pattern:
 graph LR
   Scenario["Scenario definition"] --> WeatherObjects["Weather influence objects"]
   WeatherObjects --> WeatherPack["Weather pack update loop"]
-  WeatherPack --> HexField["Sparse hex ground-truth field"]
-  HexField --> Query["Weather sample at point/time"]
+  WeatherPack --> H3Field["Sparse H3 ground-truth field"]
+  H3Field --> Query["Weather sample at point/time"]
   Query --> Ambulance["Ambulance pack derives ETA/risk"]
   Query --> Drone["Drone pack derives flight constraints"]
   Query --> Traffic["Traffic pack derives speed effects"]
   Query --> Agent["AI agent derives advice"]
-  HexField --> Map["Map presentation derives colors/layers"]
+  H3Field --> Projection["Pack map feature projection"]
+  Projection --> Map["MapLibre layers"]
 ```
 
 The word "derives" is deliberate. The canonical weather state is the raw environmental state: atmosphere, surface, and declared extensions. Derived concepts such as "hazard," "slippery," "bad for drones," or "reroute recommended" are interpretations by a presentation layer, a consuming pack, or an AI policy. They should be explainable from the raw state and should not be stored as weather truth.
@@ -78,16 +77,105 @@ The word "derives" is deliberate. The canonical weather state is the raw environ
 
 Leitbild's weather model has four layers:
 
-1. A global default state. If a point has never been touched by a weather influence, sampling that point returns default atmospheric and surface conditions for the current time.
-2. Scenario-authored weather influence objects. These are named weather systems such as a damp background, a moving rain band, a fog bank, a cold area, or a future snow front.
-3. A sparse hexagonal field. Hex cells are materialized only when weather influences affect them or when they retain non-default surface memory after an influence has passed.
-4. Presentation and consumers. The UI renders weather cells and influence shapes; other packs and AI agents query weather at points and derive their own operational meaning.
+1. A global default state. If a point has never been touched by a weather influence, sampling that point returns default atmospheric and surface conditions for the current scenario time.
+2. Scenario-authored weather influence objects. These are named weather systems such as a damp background, moving rain band, fog bank, cold area, or future snow front.
+3. A sparse H3 field. H3 cells are materialized only when weather influences affect them or when they retain non-default surface memory after an influence has passed.
+4. Presentation and consumers. The UI renders base grid outlines, affected H3 cells, and influence shapes; other packs and AI agents query weather at points and derive their own operational meaning.
 
-This is a goldilocks model for Leitbild. It is more structured than drawing a polygon and calling it "rain," but much lighter than a meteorological solver. It lets a scenario author create meaningful moving weather without coding, while the sparse field gives the simulation somewhere to store persistence: wet roads can stay wet after the rain band moves on, snow can remain after snowfall stops, and ice can decay only when conditions allow.
+This is the goldilocks model for Leitbild. It is more structured than drawing a polygon and calling it "rain," but much lighter than a meteorological solver. It lets a scenario author create meaningful moving weather without writing code, while the sparse H3 field gives the simulation somewhere to store persistence: wet roads can stay wet after the rain band moves on, snow can remain after snowfall stops, and ice can decay only when conditions allow.
+
+## What H3 Is
+
+H3 is a hierarchical geospatial indexing system originally developed by Uber and now maintained as an open-source project. It partitions the earth into cells at multiple resolutions and gives each cell a stable id. Most H3 cells are hexagons, with a small number of pentagons required by global geometry. The hierarchy lets coarse cells summarize larger regions and finer cells represent more local detail.
+
+The purpose of H3 is not to draw pretty hexagons. Its purpose is to give software a durable spatial vocabulary. A latitude/longitude point can be converted into a cell id. A polygon can be covered by a set of cell ids. A cell id can be converted back into a center point or boundary polygon. Neighbor rings can be computed. Parent cells can aggregate child cells. This makes H3 useful for heatmaps, mobility analysis, logistics, risk fields, environmental fields, exposure maps, and any system that needs to reason over spatial state without inventing a bespoke grid every time.
+
+H3 is especially attractive for Leitbild because it gives us these strengths:
+
+- Global identity: the same point maps to the same cell id across clients, server restarts, and machines.
+- Hierarchy: a detailed field can be aggregated to coarser cells for low zooms, dashboards, statistics, or AI summaries.
+- Neighbor logic: packs can reason about adjacent cells, expanding fronts, local diffusion, or nearby risk without custom geometry code.
+- Polygon coverage: a weather oval, wildfire perimeter, radiation plume, or traffic impact polygon can be converted into candidate cells.
+- Compact references: an AI agent can refer to a cell id or set of cell ids instead of passing a large polygon every time.
+- Cross-pack vocabulary: weather, wildfire, radiation, population exposure, road risk, and drone no-fly context can share cell ids while keeping their own domain state.
+
+For AI systems, H3 is useful because it turns continuous geography into stable tokens. An agent can ask for "conditions in cell 881f1d..." or receive a concise list of affected cells. It can compare route cells, summarize regions, reason about neighboring cells, and produce auditable explanations: "the ambulance route enters three H3 cells currently affected by rain and two cells still wet after the front passed."
+
+H3 does not replace GeoJSON, routing, MapLibre, or the operational object model. It complements them. GeoJSON remains the format for points, lines, and polygons. MapLibre remains the renderer. Routes remain routes. H3 gives field-like packs a shared spatial index for computation, storage, aggregation, and query.
+
+## H3 In Leitbild
+
+Leitbild uses H3 as a shared spatial field index, not as a weather-specific rendering trick. The only direct dependency on `h3-js` lives behind `src/core/spatial/*` in the Leitbild repository. Packs and UI code do not import `h3-js` directly. They use Leitbild's wrapper types and functions.
+
+The core wrapper exposes a small, intentional surface:
+
+| Wrapper concept | Purpose |
+| --- | --- |
+| `HexCellId` | Branded string id for a validated H3 cell. |
+| `HexResolution` | Branded number for a validated H3 resolution from 0 through 15. |
+| `hexCellAtPoint(point, resolution)` | Convert a GeoJSON point into a cell id. |
+| `hexCellsForPolygon(polygon, resolution)` | Cover a GeoJSON polygon with H3 cells. |
+| `hexCellCenter(cellId)` | Convert a cell id into a GeoJSON center point. |
+| `hexCellBoundary(cellId)` | Convert a cell id into a GeoJSON polygon boundary for rendering or inspection. |
+| `hexParentCell(cellId, resolution)` | Aggregate a fine cell to a coarser parent. |
+| `hexNeighborCells(cellId, radius)` | Get neighboring cells around a cell. |
+
+This wrapper is deliberately small. It keeps H3 useful without letting H3 concepts leak everywhere. If the dependency changes, if we need a special validation rule, or if we later add caching or performance instrumentation, the change belongs in the wrapper rather than in every pack.
+
+The weather pack uses H3 in two related but separate ways:
+
+1. Computation: the weather provider maintains a sparse `WeatherSparseField` keyed by H3 cell id. The field stores only materialized cells: cells currently under weather influence, cells still evolving after an influence, and stable non-default cells that remain queryable.
+2. Presentation: the weather pack projects base grid outlines, affected cells, and weather influence shapes into generic `PackMapAreaFeature` objects. The UI renders those features with MapLibre. The UI does not know the weather field store and does not compute weather.
+
+The current weather data structures are:
+
+```ts
+interface WeatherGridDefinition {
+  readonly gridId: string;
+  readonly truthResolution: HexResolution;
+}
+
+interface WeatherCellState {
+  readonly id: HexCellId;
+  readonly resolution: HexResolution;
+  readonly center: GeoJsonPoint;
+  readonly state: WeatherState;
+  readonly activeInfluenceIds: readonly ObjectId[];
+  readonly residual: number;
+  readonly updatedAt: IsoTimestamp;
+}
+
+interface WeatherSparseField {
+  readonly grid: WeatherGridDefinition;
+  readonly cells: ReadonlyMap<HexCellId, WeatherCellState>;
+  readonly activeCellIds: ReadonlySet<HexCellId>;
+}
+```
+
+`cells` is the sparse ground-truth map. It is not a UI list. It is not a list of operational objects. It is internal weather-provider state. `activeCellIds` identifies cells that still need update work because they are under active influence or still have residual surface evolution. Default cells are implicit; they are not stored.
+
+The field update loop is H3-based:
+
+```mermaid
+flowchart TD
+  Tick["Weather provider tick"] --> Frames["Interpolate active weather influence keyframes"]
+  Frames --> Polygons["Build oval influence polygons"]
+  Polygons --> H3Cover["Cover polygons with H3 cells"]
+  H3Cover --> Candidates["Union forced cells with previously active cells"]
+  Candidates --> CellLoop["Evaluate each candidate cell center"]
+  CellLoop --> Weights["Compute oval falloff weights"]
+  Weights --> Mix["Mix weather state from overlapping influences"]
+  Mix --> Evolve["Evolve surface memory and residual"]
+  Evolve --> Store{ "Still active or non-default?" }
+  Store -->|yes| Sparse["Store/update sparse H3 cell"]
+  Store -->|no| Drop["Remove from sparse map"]
+```
+
+This keeps computation full-world in principle without materializing the whole world. If a weather object exists outside the current viewport, it can still affect cells and assets. If a rain band passes over an ambulance outside the operator's current map view, the weather pack can still compute the relevant field state. Rendering is viewport-limited; truth is not conceptually viewport-limited.
 
 ## Weather Objects
 
-A weather object is an operational object in the weather domain whose `domainData` has `type: "weather_condition"` and `conditionKind: "weather_influence"`. It describes an environmental influence over space and time. The current scenario examples include `weather:oslo-damp-background`, a broad stationary background influence, and `weather:oslo-moving-rain-band`, a narrower moving oval that crosses Oslo.
+A weather object is an operational object in the weather domain whose `domainData` has `type: "weather_condition"` and `conditionKind: "weather_influence"`. It describes an environmental influence over space and time. The Oslo scenario includes `weather:oslo-damp-background`, a broad stationary background influence, and `weather:oslo-moving-rain-band`, a narrower moving oval that crosses Oslo.
 
 Weather influence geometry is keyframed. Each keyframe defines:
 
@@ -96,8 +184,8 @@ Weather influence geometry is keyframed. Each keyframe defines:
 - `semiMajorAxisM`: oval semi-major axis in meters;
 - `semiMinorAxisM`: oval semi-minor axis in meters;
 - `rotationDeg`: oval rotation angle;
-- `state`: the weather state at that keyframe;
-- `falloffCurve`: a normalized parametric curve controlling strength from center to edge.
+- `falloffCurve`: a normalized parametric curve controlling strength from center to edge;
+- optional patches to atmosphere, surface, and extension values.
 
 Between keyframes, Leitbild interpolates the center, oval size, rotation, atmosphere values, surface values, extension values, and falloff curve. A stationary weather object is simply one whose keyframes keep the same center. A moving front is one whose center changes. A rain band that grows wider or intensifies is one whose oval and state change across keyframes.
 
@@ -143,7 +231,7 @@ The weather pack deliberately does not store `frictionClass`, `frictionEstimate`
 
 ## Extensions
 
-Extensions let a scenario add typed, namespaced weather fields without changing the core weather schema. They are declared under `providerConfigs.weather.fields.extensions` in the scenario definition. A scenario can then set those fields in weather objects and keyframes.
+Extensions let a scenario add typed, namespaced weather fields without changing the base weather schema. They are declared under `providerConfigs.weather.fields.extensions` in the scenario definition. A scenario can then set those fields in weather objects and keyframes.
 
 Example:
 
@@ -175,48 +263,9 @@ A weather object can then set:
 
 Extension keys should be namespaced, such as `research.operatorWeatherLoad`, `radiological.doseRateMicroSvPerHour`, `fire.fuelMoisture`, or `aviation.ceilingFt`. The weather pack validates that an extension is declared before it is used. Number extensions interpolate linearly between keyframes. String and boolean extensions use step behavior.
 
-A radiation example is useful. Suppose a future industrial or nuclear scenario wants a weather field to carry airborne radiological context. The core weather pack should not hard-code nuclear categories. A scenario could declare `radiological.doseRateMicroSvPerHour`, `radiological.airborneIodine`, or `radiological.depositionRisk`, then keyframe those values through a plume-like weather influence. A nuclear response pack or AI agent can consume the values, while ordinary ambulance or traffic packs can ignore them.
+A radiation example is useful. Suppose a future industrial or nuclear scenario wants a weather field to carry airborne radiological context. The weather pack should not hard-code nuclear categories. A scenario could declare `radiological.doseRateMicroSvPerHour`, `radiological.airborneIodine`, or `radiological.depositionRisk`, then keyframe those values through a plume-like weather influence. A nuclear response pack or AI agent can consume the values, while ordinary ambulance or traffic packs can ignore them.
 
 Extensions are powerful, so they need discipline. Use built-in atmosphere and surface fields when they fit. Use extensions for scenario- or domain-specific environmental dimensions that still behave like environmental fields. Do not use extensions to smuggle commands, UI layout, or asset state into weather.
-
-## Hexagonal Ground Truth
-
-The sparse weather field stores weather state in hexagonal cells. A cell has an axial coordinate `(q, r)`, a stable id derived from grid id, cell size, and axial coordinates, a center point, a `WeatherState`, a list of `activeInfluenceIds`, a residual value, and an `updatedAt` timestamp.
-
-The current implementation uses a local axial hex grid anchored by a reference latitude and a scenario-specific grid id. Coordinates are projected into local meters using approximate meters per degree latitude and longitude. This is good enough for city-scale scenarios and keeps the model dependency-light. For global or multi-resolution use, H3 is a strong candidate because it gives stable global hex indexes, hierarchical resolution, neighbor traversal, and consistent cross-pack cell identity.
-
-The field is sparse. Leitbild does not allocate a world grid. It materializes cells that matter:
-
-- cells currently under active weather influences;
-- cells previously affected by weather and still carrying non-default surface state;
-- cells whose state needs continued decay or evolution;
-- cells needed for rendering within the current viewport.
-
-A query outside the sparse map still works. The pack computes the containing cell and returns the global default state unless a materialized cell exists. That means consumers can ask for weather anywhere without forcing the system to store every place on earth.
-
-## Update Loop
-
-The weather update loop advances with the control-instance clock. At each tick, the weather provider evaluates current weather influence frames, updates the sparse field, resamples probes, and emits changed weather objects as ordinary Leitbild object updates.
-
-Conceptually, the sparse field update does this:
-
-```mermaid
-flowchart TD
-  Tick["Simulation tick"] --> Frames["Interpolate active weather-object keyframes"]
-  Frames --> ActiveCells["Find hex cells under active ovals"]
-  ActiveCells --> Existing["Union with stored cells that still need evolution"]
-  Existing --> CellLoop["For each candidate cell"]
-  CellLoop --> Influences["Compute influence weights from all overlapping ovals"]
-  Influences --> Mix["Mix atmosphere, surface, extensions"]
-  Mix --> Evolve["Evolve surface memory: wetness, water, snow, ice, frost"]
-  Evolve --> Keep{Non-default or active?}
-  Keep -->|yes| Store["Store/update sparse cell"]
-  Keep -->|no| Drop["Remove cell from sparse map"]
-  Store --> Publish["Expose query/render samples"]
-  Drop --> Publish
-```
-
-The loop is deterministic and local. It does not run a global weather solver. It only touches cells that are under active weather objects or that already have stored memory. This gives us persistence without computational sprawl.
 
 ## Influence Mathematics
 
@@ -250,7 +299,7 @@ The current `priority` field exists on weather influences. It gives us a path fo
 
 ## Surface Memory And Decay
 
-A key reason for the sparse field is memory. If rain passes over a road, the cell should not instantly return to dry default conditions when the rain oval moves away. The active forcing has ended, but the surface state remains. Wetness, standing water, snow, ice, and frost evolve back toward defaults according to simple deterministic rules.
+A key reason for the sparse H3 field is memory. If rain passes over a road, the cell should not instantly return to dry default conditions when the rain oval moves away. The active forcing has ended, but the surface state remains. Wetness, standing water, snow, ice, and frost evolve back toward defaults according to simple deterministic rules.
 
 The current surface evolution is intentionally simple. Precipitation increases wetness or snow/ice-related state depending on precipitation type and ground temperature. Standing water and wetness decay over time. Snow decays more slowly when above freezing. Ice and frost decay according to warming and residual thresholds. When the cell becomes default-like and has no active influences, the sparse field removes it.
 
@@ -274,7 +323,9 @@ interface WeatherSample {
 
 `activeInfluenceIds` tells the consumer which weather objects are currently influencing the sample. If the list is empty, the sample may still be non-default because a previous weather object left persistent surface memory. That distinction is useful: "currently raining here" is different from "rain passed earlier and the surface is still wet."
 
-A future route sampler can call the same point sampler along a route geometry. It can then derive route-specific operational facts such as "40% of the route crosses wet cells," "visibility is below policy threshold near the destination," or "the ambulance with winter tires accepts this route, but the drone mission should be delayed."
+The current pack already contributes contextual weather fields to other categories when the weather pack is active. For example, a rail row for an ambulance, hospital, incident, or traffic condition can show weather at that object's location. A future route sampler should call the same underlying point-sampling concept along a route geometry and return affected distance, worst condition, and a concise explanation.
+
+Current implementation note: the provider maintains the sparse H3 field internally, and the codebase has sparse-field point sampling support. Some UI contextual fields still use a stateless active-influence sample because the generic pack protocol does not yet expose provider-private sparse field state to presentation code. The intended direction is clear: provider-owned sparse field for canonical weather memory, explicit query surfaces for consumers, and no generic UI imports of weather internals.
 
 ## Scenario Authoring
 
@@ -288,8 +339,10 @@ Minimal shape:
   "type": "weather_condition",
   "id": "weather:example-rain-band",
   "label": "Moving rain band",
-  "cellSizeM": 750,
-  "showField": true,
+  "truthResolution": 8,
+  "showAffectedCells": true,
+  "showInfluenceShape": true,
+  "showIcon": true,
   "priority": 10,
   "summary": "A narrow rain band moves east and increases surface wetness.",
   "atmosphere": {
@@ -320,7 +373,8 @@ Minimal shape:
       "center": [10.6900, 59.9250],
       "semiMajorAxisM": 5200,
       "semiMinorAxisM": 1200,
-      "rotationDeg": 68
+      "rotationDeg": 68,
+      "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.65, "y": 0.85 }, { "x": 1, "y": 0 }]
     },
     {
       "atSeconds": 420,
@@ -335,7 +389,8 @@ Minimal shape:
       "surface": {
         "wetness": 0.62,
         "standingWater": 0.12
-      }
+      },
+      "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.65, "y": 0.85 }, { "x": 1, "y": 0 }]
     }
   ]
 }
@@ -343,9 +398,11 @@ Minimal shape:
 
 Scenario authors should think in terms of environmental systems, not map decoration. A broad background condition can set the city to damp and overcast. A moving band can add stronger precipitation. A stationary cold region can create frost risk. A later keyframe can intensify rain, widen the oval, rotate the band, or reduce visibility.
 
+`truthResolution` controls the H3 resolution used by the sparse field for that influence. Resolution 8 is the current city-scale default. Higher resolutions are more detailed but create more cells. Lower resolutions are cheaper and more suitable for regional context or low-precision phenomena. Map rendering may use coarser visual resolutions at low zoom, but that is presentation; the weather pack owns truth resolution.
+
 ## Authoring Guidance For AI Agents
 
-When writing a weather scenario, choose a small number of meaningful weather objects rather than many tiny polygons. Start with a background influence if the whole operating area should have non-default conditions. Add one or two moving or localized influences for operational drama. Use `cellSizeM` large enough for performance and legibility; city dispatch scenarios usually do not need tiny cells.
+When writing a weather scenario, choose a small number of meaningful weather objects rather than many tiny polygons. Start with a background influence if the whole operating area should have non-default conditions. Add one or two moving or localized influences for operational drama. Use `truthResolution` deliberately; city dispatch scenarios usually start well at resolution 8, but not every broad background influence needs highly detailed cells.
 
 Use physical consistency. If precipitation type is `snow`, surface snow should probably rise over time or already be nonzero. If `groundTemperatureC` is below zero and wetness is high, consumers may infer ice risk. If visibility is low, explain whether fog, rain, snow, smoke, or another extension caused it. Avoid setting every field to an extreme value unless the scenario is explicitly severe.
 
@@ -355,67 +412,80 @@ Do not write derived outcome fields into weather state. Weather state should not
 
 ## Map And UI Representation
 
-The map renders weather as a projection of weather truth. Current weather cells can be drawn as low-opacity hex polygons, and influence objects can be drawn as translucent ovals that show the shape and falloff region of the weather system. The UI may derive colors such as normal, notice, adverse, or hazard from raw state, but those colors are presentation only.
+The map renders weather as a projection of weather truth. The weather pack returns generic `PackMapAreaFeature` objects; the UI turns those into MapLibre GeoJSON sources and layers. The current projection has three families:
 
-MapLibre is a good fit for this because it can render GeoJSON `fill`, `line`, `symbol`, and `heatmap` layers through WebGL. Hex cells and weather ovals should be native MapLibre layers, not DOM elements. Rich explanatory UI such as hover cards, scenario guidance, and rail rows should remain Svelte overlays.
+- base grid outlines for the current viewport and zoom;
+- affected H3 cells, colored by presentation severity derived from weather state;
+- translucent weather influence shapes showing the keyframed oval support region.
 
-Heatmaps are useful for point-density or fuzzy scalar fields, but they are not the current canonical weather representation. The current model needs inspectable cells with state. A heatmap can become a later visualization mode for temperature, wetness, precipitation, or smoke intensity, but it should not replace the sparse hex truth model.
+MapLibre is a good fit because it can render GeoJSON `fill`, `line`, `symbol`, and `heatmap` layers through WebGL. H3 cells and weather ovals should be native MapLibre layers, not DOM elements. Rich explanatory UI such as hover cards, scenario guidance, settings, and rail rows should remain Svelte overlays.
+
+Heatmaps are useful for point-density or fuzzy scalar fields, but they are not the canonical weather representation. The current model needs inspectable cells with state. A heatmap can become a later visualization mode for temperature, wetness, precipitation, smoke intensity, or confidence, but it should not replace the sparse H3 truth model.
+
+The UI boundary matters. Generic map code must not import weather sparse-field code, H3 directly, or weather calculators. The weather pack owns its computation and projects map features through the pack protocol. The UI owns rendering only.
 
 ## Performance And Scaling
 
-Weather can become expensive if handled naively. A global grid at high resolution would explode memory. Updating every hexagon every tick would be wasteful. Rendering every possible cell across the world would make the map unusable. Leitbild avoids this through sparse computation and viewport projection.
+Weather can become expensive if handled naively. A global grid at high resolution would explode memory. Updating every H3 cell every tick would be wasteful. Rendering every possible cell across the world would make the map unusable. Leitbild avoids this through sparse computation and viewport projection.
 
-The sparse field has three important properties:
+The sparse H3 field has three important properties:
 
 - Universal queries are possible because the default state exists everywhere.
 - Non-default truth is stored only where the world has actually changed.
 - Rendering can be limited to visible cells without limiting simulation truth.
 
-This means an ambulance outside the viewport can still query weather at its position. If a weather front passed over that position earlier and left a wet or icy cell in the sparse field, the query sees it. If nothing has ever affected that location, the query gets defaults. The UI only needs to draw the subset of weather cells relevant to the current view.
+This means an ambulance outside the viewport can still query weather at its position. If a weather front passed over that position earlier and left a wet or icy cell in the sparse field, the query can see it. If nothing has ever affected that location, the query gets defaults. The UI only needs to draw the subset of weather cells relevant to the current view.
 
-The current grid is city-scale and local. For national or global scenarios, we should consider H3 or another discrete global grid system. H3 would give stable cell ids, hierarchy, neighbor rings, and better cross-pack interoperability. It would also let us change resolution by scenario: coarse weather cells for regional weather, finer cells for city dispatch, and special road-segment projections for routing.
+H3 also gives us a scaling path. At low zoom, parent cells can summarize child cells. At high zoom, resolution 8 or 9 cells can show local structure. For dashboards or AI summaries, a pack can report aggregate statistics by parent cell: affected cell count, worst visibility, average wetness, or number of assets inside adverse cells. This lets us keep detailed state without forcing every consumer to read every detailed cell.
 
 ## Relationship To Other Packs
 
-The weather pack should interact through queries, contextual fields, and event/signal projections, not through hidden mutation. Current Leitbild already exposes weather as contextual fields on other objects: if the weather pack is active, the rail can show a `Weather` field for ambulances, hospitals, incidents, traffic conditions, or future asset types by sampling weather at their location.
+The weather pack should interact through queries, contextual fields, map feature projections, commands, and explicit interaction signals, not through hidden mutation. Current Leitbild exposes weather as contextual fields on other objects: if the weather pack is active, the rail can show a `Weather` field for ambulances, hospitals, incidents, traffic conditions, or future asset types by sampling weather at their location.
 
 A future ambulance pack might compute weather-aware ETA by sampling weather along a route. A traffic pack might reduce road speed where weather samples indicate high wetness and low visibility. A drone pack might reject missions when wind or precipitation violates vehicle limits. An AI monitor agent might watch for objects entering adverse weather and post an explanation.
 
 This is the right direction because it keeps policy in the consumer. Weather says: air 5 C, road wetness 0.6, visibility 5.2 km, rain 2.3 mm/h. The ambulance policy says what that means for an ambulance. The drone policy says what it means for a drone. A research scenario can then compare different policies without changing weather truth.
 
+H3 improves the interaction surface. A future traffic pack could publish road segments annotated with the H3 cells they cross. A wildfire pack could publish smoke by H3 cell and read wind by H3 cell. A radiation pack could publish deposition fields by H3 cell. An AI agent could ask for all assets in or near a set of affected cells. The cell id is the common spatial reference; each pack still owns its own data.
+
+## Future H3 Benefits Beyond Weather
+
+H3 inclusion gives Leitbild more than weather rendering. It creates a reusable spatial-field substrate for packs that need globally stable environmental or contextual state.
+
+Potential future uses include:
+
+- Wildfire: fire spread state, smoke density, ember exposure, fuel moisture, evacuation exposure, and suppression effects by H3 cell.
+- Radiation: plume concentration, ground deposition, dose-rate estimates, protective-action zones, and sampling results by H3 cell.
+- Population exposure: estimated people, vulnerable facilities, shelters, and evacuation demand by H3 cell.
+- Traffic and mobility: coarse congestion fields, road risk exposure, or weather-affected route summaries by H3 cell.
+- Drone operations: wind, precipitation, no-fly context, signal quality, battery risk, and landing-zone quality by H3 cell.
+- Maritime and aviation: fog banks, visibility fields, wind fields, harbor/airport operational constraints, and sector summaries by H3 cell.
+- AI situation awareness: compact spatial memory, regional summaries, route explanations, and cell-based trigger conditions.
+
+The most important future capability is not any single layer. It is cross-pack composition. A wildfire pack can read wind/humidity from weather cells and publish smoke cells. A traffic pack can read weather and smoke cells and publish route impacts. An ambulance pack can read route impacts and weather samples and compute ETA/risk. An AI agent can summarize the chain: "rain and smoke are affecting these H3 cells, which overlap the route to the hospital, increasing expected arrival time."
+
 ## Forest Fire Extension Discussion
 
 Forest fire is the best near-term stress test for the weather model. Fire spread depends on weather, but fire also changes the environment. Wind, humidity, temperature, precipitation, and fuel moisture affect fire behavior. The fire itself produces heat, smoke, visibility loss, road closures, evacuations, and possibly new weather-like environmental fields.
 
-One tempting approach is to create an entirely separate fire grid. That may be necessary for high-fidelity fire spread, especially if we adopt a model like Cell2Fire or ForeFire. But Leitbild's weather extension system suggests a lighter option for early fire scenarios: represent selected fire-relevant environmental fields as weather extensions on the same sparse hex field.
-
-For example, a wildfire scenario could declare:
-
-```json
-"extensions": {
-  "fire.fuelMoisture": { "type": "number", "unit": "0..1", "default": 0.35, "min": 0, "max": 1 },
-  "fire.smokeDensity": { "type": "number", "unit": "0..1", "default": 0, "min": 0, "max": 1 },
-  "fire.emberExposure": { "type": "number", "unit": "0..1", "default": 0, "min": 0, "max": 1 },
-  "fire.burnState": { "type": "string", "default": "unburned" }
-}
-```
-
-A fire pack could then query weather cells for wind and humidity, update its own fire-front state, and publish environmental effects back as weather-like influences or extension updates: smoke reduces visibility, heat changes local conditions, ember exposure raises risk, and burned ground changes future spread. This could be a clean early model if the fire simulation is medium fidelity.
-
-The limitation is equally important. A serious wildfire model may need fuel models, slope, aspect, topography, spotting, suppression lines, perimeters, rate-of-spread models, and event scheduling that do not naturally belong in a generic weather field. In that case, the fire pack should own its fire simulation state and publish only environmental projections into weather: smoke, heat, visibility, ash, road access, or fuel-moisture context. The weather field can be shared environmental context, but it should not become an all-purpose "everything grid" for every domain.
+One tempting approach is to store fire directly inside the weather field. That can be useful for early medium-fidelity scenarios if the values are environmental quantities many packs may sample: `fire.smokeDensity`, `fire.emberExposure`, or `fire.fuelMoisture`. But fire spread mechanics should not be hidden inside the weather pack. A serious fire pack needs fuel models, slope, aspect, topography, spotting, suppression lines, perimeters, rate-of-spread models, and event scheduling.
 
 The goldilocks path is therefore:
 
-1. Use weather extensions for environmental quantities that many packs may want to sample.
-2. Keep fire-specific spread mechanics in a fire pack.
-3. Let the fire pack read weather state and publish environmental effects back through weather-like projections.
-4. Move to a dedicated fire grid only when the fire simulation needs resolution or semantics that the weather field cannot cleanly provide.
+1. Use H3 as the shared spatial index.
+2. Let weather own weather state.
+3. Let a future fire pack own fire simulation state.
+4. Let fire read weather state through explicit queries.
+5. Let fire publish environmental effects such as smoke or heat as explicit pack outputs or weather-compatible extensions where appropriate.
+6. Move to a dedicated fire field only when fire semantics require it.
+
+This preserves reuse without turning weather into an all-purpose "everything grid."
 
 ## Strengths Of The Current System
 
-The current weather pack is cleanly scenario-driven. Authors can create moving weather systems in JSON, including keyframed geometry and keyframed values. It is deterministic, easy to test, and does not depend on external weather APIs. It fits Leitbild's pack architecture and can be activated or omitted per scenario.
+The current weather pack is cleanly scenario-driven. Authors can create moving weather systems in JSON, including keyframed geometry and keyframed values. It is deterministic, testable, and does not depend on external weather APIs. It fits Leitbild's pack architecture and can be activated or omitted per scenario.
 
-The sparse field is the right conceptual direction. It avoids global-grid bloat while preserving the ability to query any point. It supports memory after a front passes. It gives the UI a natural map layer and gives other packs a stable sampling interface.
+The H3 sparse field is the right conceptual direction. It avoids global-grid bloat while preserving the ability to query any point. It supports memory after a front passes. It gives the UI a natural map layer and gives other packs a stable sampling concept.
 
 The extension mechanism is also important. It lets us try new research variables without bloating the base schema. Radiation, smoke, operator workload, fuel moisture, ceiling, icing risk, or domain-specific uncertainty can be added in scenario configuration and carried through the same interpolation and sampling path.
 
@@ -423,7 +493,7 @@ The extension mechanism is also important. It lets us try new research variables
 
 The current model is not meteorological forecasting. It is an operational environmental simulator. It will not predict real weather unless connected to external data or a more sophisticated model. Scenario authors must therefore be honest about whether a weather object represents scenario truth, forecast, observation, or inference.
 
-The current local hex grid is suitable for city-scale scenarios but not a final global indexing strategy. If weather becomes a national or world-scale concern, use H3 or another stable global grid system. The current approximation also needs care near large areas or high latitudes.
+The current weather query surface is not yet the final cross-pack API. Contextual fields exist, weather probes exist, and sparse-field sampling support exists internally, but AI agents and other packs should eventually get explicit API endpoints or pack query functions for point, route, and area sampling.
 
 Surface evolution is deliberately simple. It is useful for persistence and directional behavior, but it is not a calibrated road-surface model. For winter road studies, RoadSurf or METRo-style physics should inform future improvements.
 
@@ -433,13 +503,13 @@ The UI derives presentation severity from raw state. That is acceptable as long 
 
 ## Next Steps
 
-The most valuable next step is a route weather sampler. Given an ambulance route or traffic route, sample weather along the route and return affected distance, worst conditions, and a concise explanation. This should be reusable across ambulance, traffic, logistics, and drone packs.
+The most valuable next step is a route weather sampler. Given an ambulance route, traffic route, drone path, or vessel path, sample weather along the geometry and return affected distance, worst conditions, and a concise explanation. This should be reusable across ambulance, traffic, logistics, drone, aviation, and maritime packs.
 
-The second step is scenario authoring polish. Add examples for fog, winter road icing, heavy rain/standing water, crosswind/gusts for drones, and smoke/radiation as extensions. These examples should be small, readable, and AI-authorable.
+The second step is a first-class weather query API. AI agents should be able to call "sample weather at point," "sample weather along route," and "summarize weather in area" and receive structured data with provenance and active influence ids.
 
-The third step is weather query API exposure. AI agents should be able to call an API such as "sample weather at point" or "sample weather along route" and get structured data with provenance and active influence ids.
+The third step is stronger use of H3 hierarchy. Parent-cell aggregation can make low-zoom weather views, dashboards, and AI summaries cheap and stable.
 
-The fourth step is stronger field indexing. If scenarios grow beyond city scale, evaluate H3 for global cell identity and multi-resolution aggregation.
+The fourth step is scenario authoring polish. Add examples for fog, winter road icing, heavy rain/standing water, crosswind/gusts for drones, and smoke/radiation as extensions. These examples should be small, readable, and AI-authorable.
 
 The fifth step is better physical evolution. RoadSurf-style concepts can improve surface temperature, water, ice, snow, and black ice behavior without importing a heavy meteorological runtime.
 
@@ -447,11 +517,12 @@ The sixth step is cross-pack interaction. Traffic should be able to consume weat
 
 ## Reference And Further Reading
 
+- [H3 official documentation](https://h3geo.org/docs/) and [H3 GitHub](https://github.com/uber/h3): hierarchical geospatial indexing used in Leitbild's current spatial field wrapper.
+- [h3-js package](https://www.npmjs.com/package/h3-js): JavaScript/TypeScript binding used behind Leitbild's `src/core/spatial/*` wrapper.
 - [WRF Model official GitHub organization](https://github.com/wrf-model) and [WRF repository](https://github.com/wrf-model/WRF): open-source/public-domain atmospheric modeling reference.
 - [pySTEPS GitHub](https://github.com/pySTEPS/pysteps) and [pySTEPS GMD paper](https://gmd.copernicus.org/articles/12/4185/2019/): open-source probabilistic precipitation nowcasting.
 - [RoadSurf 1.1 GMD paper](https://gmd.copernicus.org/articles/17/4837/2024/): open-source road-weather model library with road surface temperature, water, ice, snow, and black ice concepts.
 - [Open-Meteo](https://open-meteo.com/) and [Open-Meteo GitHub](https://github.com/open-meteo/open-meteo): open-source weather API and forecast-data processing stack.
-- [H3 official documentation](https://h3geo.org/docs/) and [H3 GitHub](https://github.com/uber/h3): hierarchical hexagonal geospatial indexing.
 - [MapLibre GL JS documentation](https://maplibre.org/maplibre-gl-js/docs/) and [MapLibre layer style specification](https://maplibre.org/maplibre-style-spec/layers/): native map rendering layers, including fill, line, symbol, and heatmap.
 - [NOAA Aviation Weather Center data help](https://aviationweather.gov/help/data/), [NOAA METAR page](https://www.weather.gov/asos/METAR.html), and [Met Office METAR/TAF training resource](https://www.metoffice.gov.uk/services/transport/aviation/regulated/training-resources-for-aviation/metars-and-tafs): aviation weather reporting concepts.
 - [ECMWF ecCodes information](https://codes.ecmwf.int/grib/) and [ECMWF software page](https://www.ecmwf.int/en/computing/software): GRIB/BUFR decoding and encoding tools.

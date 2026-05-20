@@ -93,6 +93,7 @@ nav:
     - Svelte 5 UI Architecture: adrs/0012-svelte-5-ui-architecture.md
     - Scenario Script Runtime: adrs/0013-scenario-script-runtime.md
     - Scenario Surface Definitions: adrs/0014-scenario-surface-definitions.md
+    - H3 Spatial Field Index: adrs/0015-h3-spatial-field-index.md
   - Source map: source-map.md
   - Simulation technologies: simulation-technologies.md
   - Future projects: future-projects.md
