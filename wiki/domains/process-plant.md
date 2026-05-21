@@ -47,17 +47,17 @@ The trace above was generated from the headless runtime with an RCP A trip at T+
 
 One important opportunity is that a multi-unit plant does not require a new "cluster simulator" abstraction. A Leitbild scenario can instantiate several independent process systems in the same process-plant provider. Each system can use the same component graph and component library but have a different `id`, telemetry configuration, and timed fault schedule. That makes a six-unit small modular reactor site a straightforward scenario-authoring problem rather than a special runtime mode.
 
-The current six-unit benchmark instantiates six copies of the expanded four-loop graph. One unit has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each unit records the same three variables: core power, steam generator A level, and turbine electrical output.
+The current six-unit benchmark instantiates six copies of the expanded four-loop graph through `graphRef: "process-plant.pressurized-water-reactor.v1"`. One unit has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each unit records the same three variables: core power, steam generator A level, and turbine electrical output.
 
 ![Six-unit process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
 
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the first measured benchmark simulated five minutes of one unit in about 0.40 seconds and five minutes of six units in about 3.15 seconds, using median wall time over three measured runs after a warm-up. The six-unit case still ran about 95 times faster than real time at this fidelity.
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one unit in about 0.41 seconds and five minutes of six units in about 2.07 seconds, using median wall time over three measured runs after a warm-up. The six-unit case still ran about 145 times faster than real time at this fidelity.
 
 This result is encouraging but not a license to ignore performance. The penalty is more than exactly linear, which likely reflects repeated full variable snapshots, telemetry recording, and ordinary JavaScript object overhead. That is acceptable for real-time six-unit headless operation today. It is also an early warning: before dozens of units, higher-fidelity physics, or dense UI trend polling, Leitbild should add a more deliberate process telemetry substrate, avoid unnecessary full snapshots in hot loops, and profile before introducing workers or typed arrays.
 
 ## Scenario-Based Universal Plant Specification
 
-The process plant is not hardcoded as a TypeScript object in the runtime. The canonical plant topology is scenario-owned data. A Leitbild Scenario Definition can include one or more `processSystems`; each system names the owning pack, the component library, and a graph object.
+The process plant is not hardcoded as a TypeScript object in the runtime. The canonical plant topology is scenario-owned data. A Leitbild Scenario Definition can include one or more `processSystems`; each system names the owning pack, the component library, and exactly one graph source. The common shape is `graphRef`, which points to a validated pack-owned graph catalog entry:
 
 ```json
 {
@@ -66,21 +66,15 @@ The process plant is not hardcoded as a TypeScript object in the runtime. The ca
       "id": "plant",
       "pack": "process-plant",
       "componentLibrary": "process-plant",
-      "graph": {
-        "schemaVersion": 1,
-        "id": "process-plant.pressurized-water-reactor.v1",
-        "title": "Pressurized Water Reactor",
-        "timestep": { "fixedStepMs": 100 },
-        "components": [],
-        "connections": [],
-        "publishedVariables": []
-      }
+      "graphRef": "process-plant.pressurized-water-reactor.v1"
     }
   ]
 }
 ```
 
-This is a radical but clean choice. It means an AI agent or human author can define a new plant layout as validated data: instantiate components, set parameters, connect ports, publish variables, and add rich metadata to links. The reusable engine remains code-owned: schemas, component definitions, solver behavior, unit handling, compiler, runtime, and tests. Scenarios can assemble systems, but they do not execute arbitrary code.
+For novel plant layouts, a process system may instead provide an inline `graph` object with `schemaVersion`, `id`, `title`, `timestep`, `components`, `connections`, and `publishedVariables`. A process system must define exactly one of `graph` or `graphRef`. Unknown graph refs fail before runtime.
+
+This is a radical but clean choice. It means an AI agent or human author can instantiate known plants compactly, or define a new plant layout as validated data: instantiate components, set parameters, connect ports, publish variables, and add rich metadata to links. The reusable engine remains code-owned: schemas, component definitions, solver behavior, unit handling, compiler, runtime, and tests. Scenarios can assemble systems, but they do not execute arbitrary code.
 
 The TypeScript builder still exists as an authoring and test helper. It is useful when writing tests or generating graph data, but it is not the runtime source of truth. Mermaid diagrams are also generated from the compiled graph for review and documentation, but Mermaid is not canonical topology.
 
