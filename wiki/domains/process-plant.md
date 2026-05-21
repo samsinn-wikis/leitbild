@@ -51,9 +51,9 @@ The current benchmark instantiates six independent copies of the expanded four-l
 
 ![Multi-system process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
 
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one system in about 0.35 seconds and five minutes of six systems in about 2.06 seconds, using median wall time over three measured runs after a warm-up. The six-system case still ran about 146 times faster than real time at this fidelity.
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one system in about 0.096 seconds and five minutes of six systems in about 0.58 seconds, using median wall time over three measured runs after a warm-up. The six-system case ran about 518 times faster than real time at this fidelity.
 
-This result is encouraging but not a license to ignore performance. The penalty is close to linear, with overhead from repeated full variable snapshots, telemetry recording, and ordinary JavaScript object allocation. That is acceptable for real-time six-system headless operation today. It is also an early warning: before dozens of systems, higher-fidelity physics, or dense UI trend polling, Leitbild should avoid unnecessary full snapshots in hot loops and profile before introducing workers or typed arrays.
+This result is encouraging but not a license to ignore performance. The current runtime keeps the public path-based model that humans and AI agents need, but internally uses a slot-backed variable table, a compiled per-phase execution plan, direct telemetry sampling, and compiled graph adjacency for link lookup. Full invariant scans are still available as explicit debug/runtime checks, but normal fixed-step execution relies on write-time validation rather than allocating a complete snapshot after every substep. That combination is the current Goldilocks point: much faster, still deterministic, and not yet burdened with workers, typed arrays, or a custom equation language.
 
 ## Scenario-Based Universal Plant Specification
 
@@ -258,7 +258,7 @@ Units are not free text. This is important for AI agents and future UI surfaces.
 
 ## Graph Compiler
 
-The graph compiler is the gate between scenario-authored configuration and runtime execution. It validates once, compiles once, and gives the runtime indexed structures so hot loops do not repeatedly parse strings.
+The graph compiler is the gate between scenario-authored configuration and runtime execution. It validates once, compiles once, and gives the runtime indexed structures so hot loops do not repeatedly parse strings. Runtime snapshots also include graph identity and the compiled variable path list; restore fails visibly if provider-private state no longer matches the compiled graph.
 
 Compilation performs these checks and transformations:
 
