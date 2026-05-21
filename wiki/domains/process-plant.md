@@ -35,7 +35,7 @@ flowchart LR
 
 The pack currently has a real headless runtime, graph compiler, provider integration, and generic pack query surface, but it is not yet a full interactive control-room product. The implemented foundation includes a JSON-compatible graph specification, a component registry, typed ports, typed process links, link-local variables, structured quantities and units, compile-time validation, a fixed-step runtime, a variable table, component behavior modules, process-link behavior modules, provider-private snapshots, tests, and query/control routes through the existing Leitbild pack surface.
 
-The current runtime can initialize a scenario-owned process system, evolve an expanded four-loop plant graph, accept typed variable-write commands for writable variables, publish selected variables in snapshots, and model simple link behavior such as flow, valve position, leak area, pressure, and radiation response. This is intentionally modest but meaningful. It proves the data model and computation pattern before adding rich control-room surfaces or higher-fidelity thermal-hydraulic components.
+The current runtime can initialize a scenario-owned process system, evolve an expanded four-loop plant graph, accept typed variable-write commands for writable variables, publish selected variables in snapshots, and model simple link behavior such as flow, valve position, leak area, pressure, and radiation response. It now also carries a slightly richer primary-to-secondary thermal spine: reactor fuel temperature, decay heat, primary coolant temperature rise, steam-generator tube-metal temperature, secondary inventory mass balance, steam production, turbine load, and condenser sink behavior. This is still medium-fidelity and lumped-parameter, but it is no longer just topology plus arbitrary trends.
 
 The current built-in graph is no longer a single-loop toy. It includes a core, vessel/pressurizer topology, four steam generators, four reactor coolant pumps, main feedwater pumps/header/control valves, auxiliary feedwater tank/pumps/header/valves, main steam isolation valves/header/turbine stop valve, turbine, generator, condenser, condensate pumps, charging, letdown, and volume-control tank.
 
@@ -51,9 +51,9 @@ The current benchmark instantiates six independent copies of the expanded four-l
 
 ![Multi-system process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
 
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). Recent local hardware runs simulate five minutes of one system in roughly 0.10-0.11 seconds and five minutes of six systems in roughly 0.60-0.68 seconds, using median wall time over three measured runs after a warm-up. The six-system case currently runs roughly 440-500 times faster than real time at this fidelity. Use `PROCESS_PLANT_BENCHMARK_WRITE_ARTIFACTS=false bun run process-plant:benchmark` to measure a remote machine without rewriting wiki artifacts.
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). Recent local hardware runs simulate five minutes of one system in roughly 0.10 seconds and five minutes of six systems in roughly 0.60 seconds, using median wall time over three measured runs after a warm-up. The six-system case currently runs roughly 500 times faster than real time at this fidelity. Use `PROCESS_PLANT_BENCHMARK_WRITE_ARTIFACTS=false bun run process-plant:benchmark` to measure a remote machine without rewriting wiki artifacts.
 
-This result is encouraging but not a license to ignore performance. The current runtime keeps the public path-based model that humans and AI agents need, but internally uses a slot-backed variable table, a compiled per-phase execution plan, direct telemetry sampling, and compiled graph adjacency for link lookup. Full invariant scans are still available as explicit debug/runtime checks, but normal fixed-step execution relies on write-time validation rather than allocating a complete snapshot after every substep. That combination is the current Goldilocks point: much faster, still deterministic, and not yet burdened with workers, typed arrays, or a custom equation language.
+This result is encouraging but not a license to ignore performance. The current runtime keeps the public path-based model that humans and AI agents need, but internally uses a slot-backed variable table, a compiled per-phase execution plan, direct telemetry sampling, and compiled graph adjacency for link lookup. Full invariant scans are still available as explicit debug/runtime checks, but normal fixed-step execution relies on write-time validation rather than allocating a complete snapshot after every substep. The latest physics pass preserves that performance model: richer behavior adds reviewed arithmetic and declared variables, not per-tick graph parsing, background workers, or shadow state. That combination is the current Goldilocks point: much faster, still deterministic, and not yet burdened with typed arrays or a custom equation language.
 
 ## Scenario-Based Universal Plant Specification
 
@@ -567,15 +567,17 @@ The owner tells the runtime whether the variable belongs to a component or a pro
 
 The current built-in graph is `process-plant.pressurized-water-reactor.v1`. It includes:
 
-- a reactor core with power, reactivity, and rod insertion fraction,
-- a steam generator with level, pressure, and heat transfer,
+- a reactor core with fission power, decay heat, fuel temperature, coolant inlet/outlet temperature, reactivity, and rod insertion fraction,
+- four steam generators with level, pressure, primary inlet/outlet temperature, tube-metal temperature, secondary temperature, heat transfer, steam production, and secondary inventory,
 - a reactor coolant pump with running state, speed fraction, and flow,
 - a feedwater source with flow,
 - a turbine load sink with electrical output and load fraction,
-- primary-water, feedwater, and steam process links,
+- primary coolant, feedwater, auxiliary feedwater, main steam, exhaust steam, condensate, charging, letdown, and relief process links,
 - a rich main steam process link with flow, pressure, radiation, valve position, and leak area variables.
 
-The runtime behavior is intentionally simple. Reactor power trends toward a target based on rod insertion and reactivity. Pump flow follows running state and speed. Steam generator heat transfer depends on core power, primary flow, and level. Steam generator level and pressure trend in response to feedwater and turbine load. The main steam link flow responds to demand, valve position, and leak area. Link radiation responds to leak state.
+The runtime behavior is intentionally simple, but now has a coherent primary-to-secondary spine. Reactor fission power trends toward a target based on rod insertion and reactivity; decay heat and fuel temperature evolve as explicit state. Pump flow follows running state and speed. Reactor heat raises coolant outlet temperature with a lumped `Q = m * cp * dT` approximation. Steam-generator heat transfer depends on primary flow, primary temperature, tube-metal temperature, secondary temperature, and level. Secondary inventory is a bounded mass-balance state driven by incoming feedwater and outgoing steam flow. Main steam pressure is propagated from the relevant source steam generator where possible instead of using one global steam pressure for every line. The main steam link flow responds to demand, valve position, and leak area. Link radiation responds to leak state.
+
+The shared approximate thermophysical helpers live in the Leitbild repo at `src/packs/process-plant/runtime/thermophysics.ts`. They provide reviewed constants and formulas for water heat capacity, latent heat, heat/flow temperature rise, steam production from heat, saturation-temperature approximation, and a small energy-balance step. Future component behavior should reuse or extend this helper layer rather than duplicating constants in individual behavior functions.
 
 This is not a physical simulator that should be used for engineering conclusions. It is a feasibility model for Leitbild's component graph, variable table, process-link semantics, and fixed-step runtime.
 
@@ -588,7 +590,7 @@ Recommended sequence:
 1. Harden the telemetry substrate into a long-run trend surface: retention policy, sampling groups, query windows, CSV export, and clear memory behavior for multi-hour runs.
 2. Add alarm definitions and threshold crossing events for the current component/link variable registry.
 3. Add a minimal process surface: variable table, published telemetry, writable controls, trend panels, and generated graph diagram.
-4. Strengthen component behavior for the primary/secondary loop: pressurizer pressure response, feedwater inventory source/sink behavior, and better steam-generator secondary-side dynamics.
+4. Strengthen component behavior for the primary/secondary loop: pressurizer pressure response, feedwater inventory source/sink behavior, and richer steam-generator secondary-side dynamics.
 5. Add richer process-link hydraulics only when the current service/link abstraction is insufficient for a concrete scenario.
 
 Avoid adding arbitrary user-authored equations in v1. They are powerful, but they open a much larger safety, validation, determinism, and debugging problem. A better early path is scenario-authored topology plus code-backed, tested component definitions.
