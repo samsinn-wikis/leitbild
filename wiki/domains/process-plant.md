@@ -51,7 +51,7 @@ The current benchmark instantiates six independent copies of the expanded four-l
 
 ![Multi-system process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
 
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one system in about 0.096 seconds and five minutes of six systems in about 0.58 seconds, using median wall time over three measured runs after a warm-up. The six-system case ran about 518 times faster than real time at this fidelity.
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). Recent local hardware runs simulate five minutes of one system in roughly 0.10-0.11 seconds and five minutes of six systems in roughly 0.60-0.68 seconds, using median wall time over three measured runs after a warm-up. The six-system case currently runs roughly 440-500 times faster than real time at this fidelity. Use `PROCESS_PLANT_BENCHMARK_WRITE_ARTIFACTS=false bun run process-plant:benchmark` to measure a remote machine without rewriting wiki artifacts.
 
 This result is encouraging but not a license to ignore performance. The current runtime keeps the public path-based model that humans and AI agents need, but internally uses a slot-backed variable table, a compiled per-phase execution plan, direct telemetry sampling, and compiled graph adjacency for link lookup. Full invariant scans are still available as explicit debug/runtime checks, but normal fixed-step execution relies on write-time validation rather than allocating a complete snapshot after every substep. That combination is the current Goldilocks point: much faster, still deterministic, and not yet burdened with workers, typed arrays, or a custom equation language.
 
@@ -320,6 +320,10 @@ Current runtime modules:
 | `units.ts` | Canonical value conversion for structured units. |
 
 This split matters because it avoids duplicate state. Component behavior and link behavior do not maintain shadow state maps. They read and write through the variable table. The variable table is where unknown paths, non-writable writes, and wrong value types fail visibly.
+
+Future component behavior should stay inside this contract. A behavior declares its solver phase, local read surface, local write surface, and update function. The execution-plan compiler expands those declarations against the compiled graph once, validates that declared write variables exist, and then reuses the invocation list every tick. This means new behavior automatically gets slot-backed runtime storage, write validation, graph-restore checks, and deterministic fixed-step execution when it uses the standard behavior API.
+
+The practical authoring rules are: keep continuous physics in behavior modules rather than Leitbild events; declare every local output in `writes`; use compiled adjacency such as incoming and outgoing link indexes instead of scanning the graph in hot loops; cache only static graph-derived data; never cache process values outside the variable table; and add tests that prove the intended physical trend. This gives future AI and human contributors a narrow safe path without turning V1 into a general equation language or plugin runtime.
 
 ```mermaid
 sequenceDiagram
