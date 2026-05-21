@@ -43,6 +43,18 @@ The current built-in graph is no longer a single-loop toy. It includes a core, v
 
 The trace above was generated from the headless runtime with an RCP A trip at T+120 seconds and loss of both main feedwater pumps at T+240 seconds. Each plotted series is independently scaled so the trend direction is visible. The raw CSV is available at [process-plant-expanded-trace.csv](../assets/process-plant/process-plant-expanded-trace.csv), and the compiled vertical Mermaid graph is available at [process-plant-expanded-graph.mmd](../assets/process-plant/process-plant-expanded-graph.mmd).
 
+## Multi-Unit SMR Cluster Feasibility
+
+One important opportunity is that a multi-unit plant does not require a new "cluster simulator" abstraction. A Leitbild scenario can instantiate several independent process systems in the same process-plant provider. Each system can use the same component graph and component library but have a different `id`, telemetry configuration, and timed fault schedule. That makes a six-unit small modular reactor site a straightforward scenario-authoring problem rather than a special runtime mode.
+
+The current six-unit benchmark instantiates six copies of the expanded four-loop graph. One unit has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each unit records the same three variables: core power, steam generator A level, and turbine electrical output.
+
+![Six-unit process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
+
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the first measured benchmark simulated five minutes of one unit in about 0.40 seconds and five minutes of six units in about 3.15 seconds, using median wall time over three measured runs after a warm-up. The six-unit case still ran about 95 times faster than real time at this fidelity.
+
+This result is encouraging but not a license to ignore performance. The penalty is more than exactly linear, which likely reflects repeated full variable snapshots, telemetry recording, and ordinary JavaScript object overhead. That is acceptable for real-time six-unit headless operation today. It is also an early warning: before dozens of units, higher-fidelity physics, or dense UI trend polling, Leitbild should add a more deliberate process telemetry substrate, avoid unnecessary full snapshots in hot loops, and profile before introducing workers or typed arrays.
+
 ## Scenario-Based Universal Plant Specification
 
 The process plant is not hardcoded as a TypeScript object in the runtime. The canonical plant topology is scenario-owned data. A Leitbild Scenario Definition can include one or more `processSystems`; each system names the owning pack, the component library, and a graph object.
@@ -330,11 +342,12 @@ The phase order is currently:
 
 1. `applyCommands`
 2. `updateControlLogic`
-3. `solveElectrical`
-4. `solveFluidFlow`
+3. `solveFluidFlowComponents`
+4. `solveFluidFlowLinks`
 5. `solveThermalTransfer`
-6. `updateComponentState`
-7. `publishOutputs`
+6. `solveElectrical`
+7. `updateComponentState`
+8. `updateProcessLinkState`
 
 The phase names are intentionally explicit. They make the runtime auditable and testable. Future higher-fidelity components may need more sophisticated ordering, iterative convergence, or domain-specific subsolvers, but the core principle should remain: continuous process evolution belongs in ordered solver phases, not incidental event order.
 
@@ -355,14 +368,19 @@ Leitbild events should represent discrete accepted history:
 
 Continuous physics should not be emitted as event chatter. Internal high-frequency process state belongs in provider-private runtime state and snapshots. Selected variables can be published through snapshots, trends, surfaces, or pack queries.
 
-The future pack query surface should use Leitbild's generic pack query route rather than a separate process-plant-specific HTTP family unless a new ADR approves that split. Candidate queries include:
+The pack query surface uses Leitbild's generic pack query route rather than a separate process-plant-specific HTTP family unless a new ADR approves that split. Current queries include:
 
 - `process-plant.variables.read`
 - `process-plant.variables.search`
 - `process-plant.graph.read`
-- `process-plant.alarms.list`
 - `process-plant.trends.read`
 - `process-plant.runtime.status`
+- `process-plant.systems.list`
+- `process-plant.telemetry.published`
+
+Candidate future queries include:
+
+- `process-plant.alarms.list`
 
 Candidate commands include:
 
@@ -372,6 +390,36 @@ Candidate commands include:
 - `process-plant.scenario.injectFault`
 
 The important rule for AI agents is that suggested actions are not plant truth until they are accepted through the command surface and committed by the runtime/provider.
+
+Timed process actions are configured inside `providerConfigs["process-plant"]`, not in the generic Leitbild scenario script. That is intentional: a pump trip, valve write, or rod movement is process-plant language. Core scenario scripting should not become a hidden process-control DSL.
+
+```json
+{
+  "providerConfigs": {
+    "process-plant": {
+      "systems": {
+        "unit-2": {
+          "telemetry": {
+            "sampleIntervalMs": 5000,
+            "variables": ["core.powerMw", "sgA.levelPercent", "turbine.electricMw"]
+          },
+          "schedule": {
+            "actions": [
+              {
+                "id": "unit-2-rcp-a-trip",
+                "atMs": 60000,
+                "type": "setVariable",
+                "path": "rcpA.running",
+                "value": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 ## Surfaces And UI
 
@@ -528,12 +576,11 @@ The next work should strengthen the process-plant pack without jumping premature
 
 Recommended sequence:
 
-1. Add a reusable process trend surface and trend query so selected variables can be sampled without dumping every internal variable into the Leitbild event journal.
+1. Harden the telemetry substrate into a long-run trend surface: retention policy, sampling groups, query windows, CSV export, and clear memory behavior for multi-hour runs.
 2. Add alarm definitions and threshold crossing events for the current component/link variable registry.
-3. Add scenario actions for process commands and timed fault injection.
-4. Add a minimal process surface: variable table, published telemetry, writable controls, and generated graph diagram.
-5. Strengthen component behavior for the primary/secondary loop: pressurizer pressure response, feedwater inventory source/sink behavior, and better steam-generator secondary-side dynamics.
-6. Add richer process-link hydraulics only when the current service/link abstraction is insufficient for a concrete scenario.
+3. Add a minimal process surface: variable table, published telemetry, writable controls, trend panels, and generated graph diagram.
+4. Strengthen component behavior for the primary/secondary loop: pressurizer pressure response, feedwater inventory source/sink behavior, and better steam-generator secondary-side dynamics.
+5. Add richer process-link hydraulics only when the current service/link abstraction is insufficient for a concrete scenario.
 
 Avoid adding arbitrary user-authored equations in v1. They are powerful, but they open a much larger safety, validation, determinism, and debugging problem. A better early path is scenario-authored topology plus code-backed, tested component definitions.
 
