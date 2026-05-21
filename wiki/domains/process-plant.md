@@ -43,17 +43,17 @@ The current built-in graph is no longer a single-loop toy. It includes a core, v
 
 The trace above was generated from the headless runtime with an RCP A trip at T+120 seconds and loss of both main feedwater pumps at T+240 seconds. Each plotted series is independently scaled so the trend direction is visible. The raw CSV is available at [process-plant-expanded-trace.csv](../assets/process-plant/process-plant-expanded-trace.csv), and the compiled vertical Mermaid graph is available at [process-plant-expanded-graph.mmd](../assets/process-plant/process-plant-expanded-graph.mmd).
 
-## Multi-Unit SMR Cluster Feasibility
+## Multi-System Feasibility
 
-One important opportunity is that a multi-unit plant does not require a new "cluster simulator" abstraction. A Leitbild scenario can instantiate several independent process systems in the same process-plant provider. Each system can use the same component graph and component library but have a different `id`, telemetry configuration, and timed fault schedule. That makes a six-unit small modular reactor site a straightforward scenario-authoring problem rather than a special runtime mode.
+One important opportunity is that a multi-unit plant does not require a new fleet-wide simulator abstraction. A Leitbild scenario can instantiate several independent process systems in the same process-plant provider. Each system can use the same component graph and component library but have a different `id`, component parameter overlays, initial state, telemetry configuration, and timed fault schedule. That makes a small modular reactor site a straightforward scenario-authoring problem rather than a special runtime mode, while still leaving room for systems that are not geographically clustered.
 
-The current six-unit benchmark instantiates six copies of the expanded four-loop graph through `graphRef: "process-plant.pressurized-water-reactor.v1"`. One unit has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each unit records the same three variables: core power, steam generator A level, and turbine electrical output.
+The current benchmark instantiates six independent copies of the expanded four-loop graph through `graphRef: "process-plant.pressurized-water-reactor.v1"`. Six is a useful measurement fixture, not a design target. The same mechanism should support arbitrary `n` process systems and mixed graph refs, such as four systems using one plant graph and eight systems using another. One benchmark system has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each system records the same three variables: core power, steam generator A level, and turbine electrical output.
 
-![Six-unit process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
+![Multi-system process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
 
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one unit in about 0.41 seconds and five minutes of six units in about 2.07 seconds, using median wall time over three measured runs after a warm-up. The six-unit case still ran about 145 times faster than real time at this fidelity.
+The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). On the current local hardware, the latest benchmark simulated five minutes of one system in about 0.35 seconds and five minutes of six systems in about 2.06 seconds, using median wall time over three measured runs after a warm-up. The six-system case still ran about 146 times faster than real time at this fidelity.
 
-This result is encouraging but not a license to ignore performance. The penalty is more than exactly linear, which likely reflects repeated full variable snapshots, telemetry recording, and ordinary JavaScript object overhead. That is acceptable for real-time six-unit headless operation today. It is also an early warning: before dozens of units, higher-fidelity physics, or dense UI trend polling, Leitbild should add a more deliberate process telemetry substrate, avoid unnecessary full snapshots in hot loops, and profile before introducing workers or typed arrays.
+This result is encouraging but not a license to ignore performance. The penalty is close to linear, with overhead from repeated full variable snapshots, telemetry recording, and ordinary JavaScript object allocation. That is acceptable for real-time six-system headless operation today. It is also an early warning: before dozens of systems, higher-fidelity physics, or dense UI trend polling, Leitbild should avoid unnecessary full snapshots in hot loops and profile before introducing workers or typed arrays.
 
 ## Scenario-Based Universal Plant Specification
 
@@ -66,13 +66,24 @@ The process plant is not hardcoded as a TypeScript object in the runtime. The ca
       "id": "plant",
       "pack": "process-plant",
       "componentLibrary": "process-plant",
-      "graphRef": "process-plant.pressurized-water-reactor.v1"
+      "graphRef": "process-plant.pressurized-water-reactor.v1",
+      "parameters": {
+        "core": {
+          "ratedPowerMw": 2890
+        }
+      },
+      "initialState": {
+        "core.rodInsertionFraction": 0.18,
+        "sgA.secondaryInventoryKg": 60000
+      }
     }
   ]
 }
 ```
 
 For novel plant layouts, a process system may instead provide an inline `graph` object with `schemaVersion`, `id`, `title`, `timestep`, `components`, `connections`, and `publishedVariables`. A process system must define exactly one of `graph` or `graphRef`. Unknown graph refs fail before runtime.
+
+Per-system `parameters` and `initialState` configure one instantiated system without changing its topology. `parameters` overlays component parameter objects before graph compilation. `initialState` sets declared runtime variable values before the first solver tick. Initial state is not an operator command, so it can initialize declared state variables that are not writable during runtime. Timed actions and operator commands still go through the writable variable surface. If topology must change, use a different `graphRef` or inline graph rather than patching the referenced graph.
 
 This is a radical but clean choice. It means an AI agent or human author can instantiate known plants compactly, or define a new plant layout as validated data: instantiate components, set parameters, connect ports, publish variables, and add rich metadata to links. The reusable engine remains code-owned: schemas, component definitions, solver behavior, unit handling, compiler, runtime, and tests. Scenarios can assemble systems, but they do not execute arbitrary code.
 
