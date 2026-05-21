@@ -79,6 +79,12 @@ Domain Events are accepted canonical changes ordered by the Control Instance run
 
 A pack contributes domain schemas, commands, simulation providers, presentation, object categories, scenario codecs, interaction handlers, and optional AI guidance. A pack is the user-facing installable unit; provider IDs are internal runtime wiring.
 
+## Process Plant Graph Spec
+
+Process plant systems are scenario-owned graph specs under `processSystems`. A `PlantGraphSpec` declares a fixed timestep, component instances, typed connections, optional process-link metadata, process-link variables, and published variables. The graph compiler validates component kinds, parameters, port refs, port compatibility, process link kinds, unit-bearing variables, and publication paths before runtime.
+
+The process-plant pack uses scenario data as the canonical plant topology and keeps component physics code-backed and tested. Stable process variable paths, typed ports, structured quantities/units, and rich process links are documented in [[domains/process-plant]].
+
 ## Surface Definition Spec
 
 A Surface Definition declares safe UI primitives for a scenario. V1 primitives include map, object rail, system footer, and guidance overlay. Scenarios should not rely on hidden map or rail defaults. Generated or adaptive UI must remain constrained by safe primitive registries.

@@ -24,7 +24,7 @@ Architecture decision records live in `docs/adr` in the Leitbild repo and are mi
 
 ## Pack Source Files
 
-The ambulance pack lives under `src/packs/ambulance`. It owns ambulance, hospital, incident domain data, commands, presentation, scenario expansion, simulation mechanics, and arrival interactions. The traffic pack lives under `src/packs/traffic` and owns traffic condition data and scenario expansion.
+The ambulance pack lives under `src/packs/ambulance`. It owns ambulance, hospital, incident domain data, commands, presentation, scenario expansion, simulation mechanics, and arrival interactions. The traffic pack lives under `src/packs/traffic` and owns traffic condition data and scenario expansion. The weather pack lives under `src/packs/weather` and owns weather influence objects, sparse H3 field computation, weather queries, and weather map feature projection. The process-plant pack lives under `src/packs/process-plant` and owns process-system graph schemas, component definitions, compilation, headless runtime behavior, process-link behavior, and runtime tests.
 
 ## UI Source Files
 
