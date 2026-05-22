@@ -5,65 +5,39 @@ type: domain
 
 # Process Plant Pack
 
-The Leitbild process-plant pack is the foundation for connecting detailed process-control simulations to the wider Leitbild world. It is designed for systems where the important state is not primarily "things moving on a map," but variables evolving inside an interconnected plant: flows, pressures, temperatures, powers, inventories, valve positions, pump states, trips, alarms, and operator commands. A nuclear power plant, hospital utility system, chemical process plant, water-treatment facility, ship machinery plant, district heating network, or industrial robotics cell can all fit this family if their behavior can be described as components connected by typed process links.
+The Leitbild `process-plant` pack is the foundation for running detailed process-control simulations inside the same multi-pack world as maps, vehicles, weather, traffic, incidents, and AI agents. It is meant for systems whose important state is an evolving network of process variables: flows, pressures, temperatures, powers, inventories, valve positions, pump states, trips, alarms, and operator commands. A nuclear plant is the current feasibility example because it stresses the architecture, but the pack is deliberately generic enough to support future hospital utilities, chemical plants, water-treatment facilities, ship machinery plants, district heating networks, or other interconnected process systems.
 
-The pack is deliberately named `process-plant`, not `pwr`, because the technical goal is broader than one nuclear example. A pressurized water reactor-style example graph is currently used as the feasibility test because it stresses the architecture in useful ways: hydraulic and thermal coupling, reactor power, steam generation, turbine load, control variables, link sensors, valves, leaks, and radiological monitoring. The pack should, however, remain a generic process simulation engine whose plant-specific behavior comes from scenario-owned graph data and registered component definitions.
-
-## Why This Pack Exists
-
-Leitbild already supports operational map work: ambulances, incidents, hospitals, traffic conditions, weather, and other spatial entities. A process-control simulation adds a second kind of operational world. Instead of only asking "where is the ambulance?", a control-room surface may ask "what is the steam generator level?", "is this valve open?", "what is the main steam line radiation?", "has the pump tripped?", or "how will a loss of feedwater affect heat removal in the next five minutes?"
-
-This is useful because many command-and-control studies involve both an outside world and an inside plant. A hospital may receive ambulances while its emergency department, oxygen supply, backup generator, or bed-management process evolves internally. A power plant may interact with weather, grid stress, road access, supply deliveries, emergency services, and external command centers. A ship may be shown on a map while its engine room, electrical buses, pumps, and damage-control systems evolve in a separate surface. The process-plant pack is the bridge that lets these internal process worlds participate in Leitbild without forcing every internal variable to become a map object.
-
-The most important boundary is this: continuous physics stays inside the process-plant runtime. Leitbild's event bus is excellent for discrete accepted history such as commands, alarms, scenario injections, trips, and threshold crossings. It is not the right mechanism for continuous process physics. A pump should not emit a stream of "water moved" events to a steam generator. A solver should compute flow, heat transfer, and state evolution from a compiled graph in a deterministic update loop.
+The key architectural boundary is simple: continuous physics stays inside the process-plant runtime. Leitbild events record discrete accepted history such as commands, alarms, trips, fault injections, and threshold crossings. A pump does not emit “water moved” messages to a steam generator; the fixed-step runtime computes flow, heat transfer, inventory changes, and process state from a compiled component graph.
 
 ```mermaid
 flowchart LR
-  World["Leitbild world\nmap, actors, commands, events"] --> Scenario["Scenario definition"]
-  Scenario --> Graph["Process system graph\ncomponents + connections"]
-  Graph --> Compiler["Process graph compiler"]
-  Compiler --> Runtime["Headless fixed-step runtime"]
-  Runtime --> Variables["Process variable table"]
-  Variables --> Surface["Control-room surface\nfuture"]
-  Variables --> Query["Pack query surface\nfuture"]
-  Query --> Agents["AI agents and tools"]
-  Runtime --> Events["Discrete events\nalarms, trips, accepted commands"]
-  Events --> World
+  Scenario["Scenario definition"] --> System["processSystems[]"]
+  System --> Graph["PlantGraphSpec or graphRef"]
+  Graph --> Compiler["Graph compiler"]
+  Compiler --> Runtime["Fixed-step runtime"]
+  Runtime --> Table["Authoritative variable table"]
+  Table --> Queries["Pack query surface"]
+  Table --> Telemetry["Trends and acceptance traces"]
+  Table --> FutureUi["Future process surface"]
+  Runtime --> Events["Discrete alarms / trips / command results"]
+  Events --> Leitbild["Leitbild control instance"]
 ```
 
 ## Current Status
 
-The pack currently has a real headless runtime, graph compiler, provider integration, and generic pack query surface, but it is not yet a full interactive control-room product. The implemented foundation includes a JSON-compatible graph specification, a component registry, typed ports, typed process links, link-local variables, structured quantities and units, compile-time validation, a fixed-step runtime, a variable table, component behavior modules, process-link behavior modules, provider-private snapshots, tests, and query/control routes through the existing Leitbild pack surface.
+The pack now has a real graph compiler, scenario-owned system assembly, a fixed-step headless runtime, provider lifecycle integration, provider-private snapshot/restore, a generic pack query surface, writable-variable commands, timed pack-owned schedules, telemetry buffers, multi-system testbeds, benchmark scripts, and acceptance traces. It is not yet a finished control-room product. The current work is about making the runtime and model strong enough to bear more detailed process displays, alarms, procedures, and AI-agent interaction later.
 
-The current runtime can initialize a scenario-owned process system, evolve an expanded four-loop plant graph, accept typed variable-write commands for writable variables, publish selected variables in snapshots, and model simple link behavior such as flow, valve position, leak area, pressure, and radiation response. It now also carries a slightly richer primary-to-secondary thermal spine: reactor fuel temperature, decay heat, primary loop-flow inertia, primary coolant temperature rise, steam-generator tube-metal temperature, recirculation-influenced heat transfer, secondary inventory mass balance, boiling rate, steam quality, bounded feedwater pump response, feedwater and auxiliary-feedwater tank inventory, turbine load, condenser condensate production/inventory, and pressurizer pressure/inventory control. This is still medium-fidelity and lumped-parameter, but it is no longer just topology plus arbitrary trends.
+The built-in demonstration graph is `process-plant.pressurized-water-reactor.v1`. It is a medium-fidelity research model, not licensing-grade analysis software. It currently models a four-loop PWR-like plant skeleton with core, vessel, pressurizer, four steam generators, four reactor coolant pumps, main and auxiliary feedwater paths, main steam paths, turbine, generator, condenser, condensate pumps, charging, letdown, volume-control tank, process links, link sensors, link valves, and link leak modifiers.
 
-The current built-in graph is no longer a single-loop toy. It includes a core, vessel/pressurizer topology, four steam generators, four reactor coolant pumps, main feedwater pumps/header/control valves, auxiliary feedwater tank/pumps/header/valves, main steam isolation valves/header/turbine stop valve, turbine, generator, condenser, condensate pumps, charging, letdown, and volume-control tank.
+## Scenario-Owned Plant Assembly
 
-![Expanded process plant trace](../assets/process-plant/process-plant-expanded-trace.svg)
-
-The trace above was generated from the headless runtime with an RCP A trip at T+120 seconds and loss of both main feedwater pumps at T+240 seconds. Each plotted series is independently scaled so the trend direction is visible. The raw CSV is available at [process-plant-expanded-trace.csv](../assets/process-plant/process-plant-expanded-trace.csv), and the compiled vertical Mermaid graph is available at [process-plant-expanded-graph.mmd](../assets/process-plant/process-plant-expanded-graph.mmd).
-
-## Multi-System Feasibility
-
-One important opportunity is that a multi-unit plant does not require a new fleet-wide simulator abstraction. A Leitbild scenario can instantiate several independent process systems in the same process-plant provider. Each system can use the same component graph and component library but have a different `id`, component parameter overlays, initial state, telemetry configuration, and timed fault schedule. That makes a small modular reactor site a straightforward scenario-authoring problem rather than a special runtime mode, while still leaving room for systems that are not geographically clustered.
-
-The current benchmark instantiates six independent copies of the expanded four-loop graph through `graphRef: "process-plant.pressurized-water-reactor.v1"`. Six is a useful measurement fixture, not a design target. The same mechanism should support arbitrary `n` process systems and mixed graph refs, such as four systems using one plant graph and eight systems using another. One benchmark system has no fault; the others receive staggered process actions over a five-minute run, including reactor coolant pump trips, feedwater pump trips, turbine load reduction, and a combined fault. Each system records the same three variables: core power, steam generator A level, and turbine electrical output.
-
-![Multi-system process plant benchmark](../assets/process-plant/process-plant-six-unit-trace.svg)
-
-The raw benchmark data is available as [process-plant-six-unit-trace.csv](../assets/process-plant/process-plant-six-unit-trace.csv), with performance measurements in [process-plant-six-unit-performance.json](../assets/process-plant/process-plant-six-unit-performance.json). Recent local hardware runs simulate five minutes of one system in roughly 0.14 seconds and five minutes of six systems in roughly 0.84 seconds, using median wall time over three measured runs after a warm-up. The six-system case currently runs roughly 357 times faster than real time at this fidelity. Use `PROCESS_PLANT_BENCHMARK_WRITE_ARTIFACTS=false bun run process-plant:benchmark` to measure a remote machine without rewriting wiki artifacts.
-
-This result is encouraging but not a license to ignore performance. The current runtime keeps the public path-based model that humans and AI agents need, but internally uses a slot-backed variable table, a compiled per-phase execution plan, direct telemetry sampling, and compiled graph adjacency for link lookup. Full invariant scans are still available as explicit debug/runtime checks, but normal fixed-step execution relies on write-time validation rather than allocating a complete snapshot after every substep. The latest physics passes preserve that performance model: richer core, steam-generator, feedwater-pump, pressurizer, process-tank, condenser-inventory, and primary-loop inertia behavior adds reviewed arithmetic and declared variables, not per-tick graph parsing, background workers, or shadow state. That combination is the current Goldilocks point: much faster, still deterministic, and not yet burdened with typed arrays or a custom equation language.
-
-## Scenario-Based Universal Plant Specification
-
-The process plant is not hardcoded as a TypeScript object in the runtime. The canonical plant topology is scenario-owned data. A Leitbild Scenario Definition can include one or more `processSystems`; each system names the owning pack, the component library, and exactly one graph source. The common shape is `graphRef`, which points to a validated pack-owned graph catalog entry:
+Plant systems are assembled from scenario data. A scenario may instantiate one or many process systems, each with a `graphRef` or inline graph, parameter overlays, initial state, schedules, and telemetry configuration.
 
 ```json
 {
   "processSystems": [
     {
-      "id": "plant",
+      "id": "unit-1",
       "pack": "process-plant",
       "componentLibrary": "process-plant",
       "graphRef": "process-plant.pressurized-water-reactor.v1",
@@ -77,77 +51,59 @@ The process plant is not hardcoded as a TypeScript object in the runtime. The ca
         "sgA.secondaryInventoryKg": 60000
       }
     }
-  ]
+  ],
+  "providerConfigs": {
+    "process-plant": {
+      "systems": {
+        "unit-1": {
+          "schedule": {
+            "actions": [
+              {
+                "id": "trip-rcp-a",
+                "atMs": 60000,
+                "type": "tripComponent",
+                "componentId": "rcpA"
+              }
+            ]
+          },
+          "telemetry": {
+            "sampleIntervalMs": 5000,
+            "variables": ["core.powerMw", "sgA.levelPercent", "turbine.electricMw"]
+          }
+        }
+      }
+    }
+  }
 }
 ```
 
-For novel plant layouts, a process system may instead provide an inline `graph` object with `schemaVersion`, `id`, `title`, `timestep`, `components`, `connections`, and `publishedVariables`. A process system must define exactly one of `graph` or `graphRef`. Unknown graph refs fail before runtime.
+This design keeps topology configurable without letting scenarios execute arbitrary code. Scenarios instantiate components and links; component physics remains code-backed, typed, reviewed, and tested. A future AI agent can author a graph or choose a known `graphRef`, but the compiler still rejects invalid topology, parameters, units, link contracts, initial state, schedules, and commands before runtime.
 
-Per-system `parameters` and `initialState` configure one instantiated system without changing its topology. `parameters` overlays component parameter objects before graph compilation. `initialState` sets declared runtime variable values before the first solver tick. Initial state is not an operator command, so it can initialize declared state variables that are not writable during runtime. Timed actions and operator commands still go through the writable variable surface. If topology must change, use a different `graphRef` or inline graph rather than patching the referenced graph.
+## Component Graph
 
-This is a radical but clean choice. It means an AI agent or human author can instantiate known plants compactly, or define a new plant layout as validated data: instantiate components, set parameters, connect ports, publish variables, and add rich metadata to links. The reusable engine remains code-owned: schemas, component definitions, solver behavior, unit handling, compiler, runtime, and tests. Scenarios can assemble systems, but they do not execute arbitrary code.
+The canonical model is `PlantGraphSpec`. It contains `schemaVersion`, `id`, `title`, `timestep`, `components`, `connections`, and `publishedVariables`. Components declare an id, kind, label, parameters, ports, and process variables. Connections link typed ports and may carry physical metadata plus link-local variables.
 
-The TypeScript builder still exists as an authoring and test helper. It is useful when writing tests or generating graph data, but it is not the runtime source of truth. Mermaid diagrams are also generated from the compiled graph for review and documentation, but Mermaid is not canonical topology.
-
-## Component Model
-
-A component is a typed process element with parameters, ports, variables, and behavior. Examples in the current component library include `reactorCore`, `reactorVessel`, `steamGenerator`, `centrifugalPump`, `processHeader`, `steamHeader`, `processTank`, `processValve`, `steamValve`, `pressurizer`, `pressurizerHeaters`, `generatorSink`, `turbineLoadSink`, and `condenserSink`. These are early component models, not high-fidelity engineering-grade implementations. Their role is to prove the mechanism: components expose typed interfaces and variables, while the runtime behavior evolves their state.
-
-Some component kinds are topology components today. A topology component has typed ports and a validated place in the graph, but no invented solver behavior. That is deliberate. A header, tank, or valve shell can be present in the topology so the graph is inspectable and future behavior has a place to attach, without pretending that the current solver models every internal transient.
-
-Component instances in a graph are deliberately small:
-
-```ts
-interface ComponentInstanceSpec {
-  readonly id: ComponentId
-  readonly kind: ComponentKind
-  readonly label: string
-  readonly parameters: unknown
-  readonly initialState?: unknown
-}
-```
-
-The `kind` points to a registered component definition. The definition owns the schema for parameters and optional initial state. That preserves TypeScript-backed validation even though plant layouts are scenario-authored JSON. The graph author can write `kind: "centrifugalPump"` with parameters, but the compiler checks whether that component kind exists and whether the supplied parameters match its schema.
-
-Component definitions also declare ports. Ports are how the component graph becomes more than a picture. A port has a kind and direction, and the compiler uses that information to reject impossible connections.
-
-Current port kinds are:
-
-| Port kind | Typical meaning |
-| --- | --- |
-| `hydraulic` | Liquid flow connection. |
-| `thermal` | Heat transfer/contact connection. |
-| `hydraulicThermal` | Combined hydraulic and thermal process connection. |
-| `steam` | Steam flow connection. |
-| `electricalAc` | AC electrical power connection. |
-| `mechanicalShaft` | Mechanical torque/shaft connection. |
-| `controlSignal` | Continuous or analog control signal. |
-| `logicSignal` | Discrete logic signal. |
-
-Current port directions are `in`, `out`, and `bidirectional`. The compiler checks both port kind compatibility and direction. For example, a steam outlet can connect to a steam inlet, but an electrical output cannot connect directly to a hydraulic inlet.
+The compiler validates and indexes the graph before runtime. It rejects duplicate ids, unknown component kinds, invalid parameters, impossible port connections, missing published variables, bad initial values, invalid link actuators, duplicate variable paths, incompatible fluid link solver models, and broken primary-loop topology. Runtime code receives compiled component/link tables and adjacency indexes, not raw strings to reparse on every tick.
 
 ```mermaid
-flowchart TB
-  Core["reactorCore\nhotLegA-D out\ncoldLegA-D in"] -->|"primaryCoolant / fluidFlow"| SG["steamGenerator A-D\nprimary + secondary sides"]
-  SG -->|"primaryCoolant / fluidFlow"| Pump["centrifugalPump\nRCP A-D"]
-  Pump -->|"primaryCoolant / fluidFlow"| Core
-  FW["main feedwater pumps + header"] -->|"feedwater / fluidFlow"| SG
-  AFW["aux feedwater pumps + header"] -->|"auxFeedwater / fluidFlow"| SG
-  SG -->|"mainSteam / fluidFlow"| SteamHeader["MSIVs + main steam header"]
-  SteamHeader -->|"mainSteam / fluidFlow"| Turbine["turbineLoadSink"]
-  Turbine -->|"electricalPower"| Generator["generatorSink"]
-  Turbine -->|"exhaustSteam / fluidFlow"| Condenser["condenserSink"]
+flowchart TD
+  Raw["PlantGraphSpec JSON"] --> Schema["Schema validation"]
+  Schema --> Components["Resolve component definitions"]
+  Components --> Ports["Parse port refs"]
+  Ports --> Links["Validate typed links"]
+  Links --> Variables["Compile component + link variables"]
+  Variables --> Contracts["Validate fluid solver contracts"]
+  Contracts --> Indexes["Build adjacency indexes"]
+  Indexes --> Runtime["Runtime-ready graph"]
 ```
 
-## Rich Semantic Process Links
+Current component kinds include `reactorCore`, `reactorVessel`, `steamGenerator`, `centrifugalPump`, `processHeader`, `steamHeader`, `processTank`, `processValve`, `steamValve`, `pressurizer`, `pressurizerHeaters`, `generatorSink`, `turbineLoadSink`, and `condenserSink`. Some are richer behaviors, while others are still topology or simple lumped models. That is intentional: the graph can become more detailed without forcing every component to become high-fidelity at once.
 
-The graph author writes `connections`, but compiled/runtime code treats them as **process links**. A process link is a typed connection between two component ports. It may be pure topology, or it may own physical metadata and link-local variables.
+## Rich Process Links
 
-This is a core architectural choice. In a real plant, a pipe can have pressure, flow, temperature, radiation, valves, leaks, volume, resistance, roughness, sensors, and actuators. A naive component graph would model every valve and sensor as a separate node, turning a readable plant graph into a huge chain of pipe-valve-pipe-sensor-pipe fragments. Leitbild's v1 compromise is to let simple conduit-local state live on the link itself.
+Connections are also process links. A link may be a pure topology edge, or it may own physical metadata and link-local variables such as flow, pressure, pressure drop, temperature, radiation, valve position, leak area, or leak flow. This avoids graph explosion. A simple valve or instrument does not need to become its own component between two pipe segments unless it has multiple ports, independent dynamics, or a meaningful standalone failure mode.
 
-Use a process-link variable when the value observes or modifies that one connection. Use a component when the item has multiple ports, meaningful internal dynamics, separate failure modes, or deserves a first-class display/control object.
-
-Example main steam link:
+Current fluid links declare `connectionKind`, `service`, `nominalFluid`, `designPhase`, and `solverModel`. These fields are not prose labels. The graph compiler treats them as a contract. For example, primary-coolant links must expose pressure and pressure-drop variables, and steam links must expose the state surfaces required by the steam solver model.
 
 ```json
 {
@@ -194,418 +150,105 @@ Example main steam link:
 }
 ```
 
-This produces stable variable paths such as:
+Compiled link variables become stable paths such as `sg-a-steam-to-msiv-a.flowKgPerS`, `sg-a-steam-to-msiv-a.pressureMPa`, `sg-a-steam-to-msiv-a.radiationMSvPerH`, `sg-a-steam-to-msiv-a.valve.positionFraction`, and `sg-a-steam-to-msiv-a.leak.areaFraction`.
 
-- `sg-a-steam-to-msiv-a.flowKgPerS`
-- `sg-a-steam-to-msiv-a.pressureMPa`
-- `sg-a-steam-to-msiv-a.radiationMSvPerH`
-- `sg-a-steam-to-msiv-a.valve.positionFraction`
-- `sg-a-steam-to-msiv-a.leak.areaFraction`
+## Solver Models And Runtime
 
-Those paths are the shared language for snapshots, tests, future trends, future control-room widgets, future AI agents, and future pack query responses.
+The runtime is fixed-step and headless. It owns one authoritative process variable table and runs ordered solver phases:
 
-## Connection Kinds And Services
+1. apply commands,
+2. update control logic,
+3. solve fluid-flow components,
+4. solve fluid-flow links,
+5. solve thermal transfer,
+6. solve electrical behavior,
+7. update component state,
+8. update process-link state.
 
-The current connection kinds are:
+Behavior modules do not mutate arbitrary global state. Each component or link behavior runs through a constrained behavior context with declared read surfaces and declared write outputs. The execution-plan compiler expands behavior invocations once, validates declared write paths, and then reuses the plan on every tick. This gives future components a firm contract without building a general-purpose plugin engine too early.
 
-| Connection kind | Typical solver ownership |
-| --- | --- |
-| `fluidFlow` | Liquid, steam, gas, or two-phase process transport. |
-| `thermalContact` | Heat transfer/contact. |
-| `electricalPower` | Electrical power transfer. |
-| `mechanicalTorque` | Shaft/torque transfer. |
-| `controlSignal` | Analog or continuous control signal. |
-| `logicSignal` | Discrete logic signal. |
+The current physics is lumped and directional but increasingly coherent. Reactor core behavior includes fission power, decay heat, fuel temperature, primary coolant heat-up, and simple negative temperature feedback. Reactor coolant pumps own loop-flow inertia and developed head. Steam generators track primary/secondary temperatures, tube-metal temperature, heat transfer, boiling rate, secondary inventory, steam mass, pressure, collapsed level, void fraction, and swell level. The pressurizer now has explicit steam mass accounting: heaters create steam mass, spray condenses it, relief removes it, and steam-mass deviation contributes to pressure response. The vessel tracks primary coolant inventory and pressure bias. SGTR-like tube leakage transfers primary mass into secondary inventory and raises the affected secondary/main-steam radiation indication.
 
-Fluid links must also declare a `service`. Current built-in services include `primaryCoolant`, `mainSteam`, `feedwater`, `auxFeedwater`, `exhaustSteam`, `condensate`, `charging`, `letdown`, and `primaryRelief`. Services are the stable grouping used by solver helpers and query consumers. They replace the earlier brittle distinction between `hydraulicFlow` and `steamFlow`.
+The model is deliberately not a RELAP, Modelica, or CFD replacement. Its value is first-order process behavior that is strong enough for control-room workflow research, scenario scripting, AI-agent studies, and cross-pack interaction. The next level of fidelity should continue this approach: deepen specific component physics only when it unlocks scenario value and can be tested without compromising runtime clarity.
 
-`nominalFluid`, `designPhase`, and `solverModel` are design metadata. They say what the connection is normally expected to carry, not what the fluid must always be. This matters because a nominal water line can flash, a nominal steam line can become wet, and a tube leak can contaminate a secondary-side line. Future physics should update runtime variables such as quality, void fraction, pressure, or enthalpy without rewriting topology.
+## Pack Query And Command Surface
 
-The compiler validates declared `connectionKind` against typed ports. If a hydraulic port pair requires `fluidFlow`, a declared `connectionKind: "thermalContact"` fails before runtime.
+The pack uses Leitbild's generic pack query surface. It does not add a separate `/api/process-plant/*` endpoint family.
 
-## Process Variables
+Implemented queries include:
 
-Every meaningful process value has a stable path and structured metadata. Variables can belong to components or process links. A variable descriptor includes:
-
-| Field | Meaning |
-| --- | --- |
-| `path` | Stable path. Component-local paths are compiled to `componentId.localPath`; link-local paths are compiled to `connectionId.localPath`. |
-| `label` | Human-readable name. |
-| `kind` | `state`, `derived`, `control`, `parameter`, `alarm`, or `discrete`. |
-| `domain` | `hydraulic`, `thermal`, `nuclear`, `electrical`, `control`, `operator`, or `radiological`. |
-| `writable` | Whether accepted commands may write this variable. |
-| `publish` | `internal`, `telemetry`, `alarm`, or `leitbild`. |
-| `quantity` | Structured physical quantity. |
-| `unit` | Structured unit validated against the quantity. |
-
-Process-link variables also require `initialValue`, and may declare `sensorId` or `actuatorId`. A variable cannot declare both a sensor and actuator id. An actuator id requires a writable variable. Initial values are type checked: boolean quantities require boolean values, while physical numeric quantities require numeric values.
-
-Current quantities and units are intentionally finite:
-
-| Quantity | Allowed units |
-| --- | --- |
-| `boolean` | `boolean` |
-| `flowRate` | `kg/s` |
-| `head` | `Pa` |
-| `power` | `MW` |
-| `pressure` | `MPa`, `Pa` |
-| `radiationDoseRate` | `mSv/h` |
-| `ratio` | `fraction`, `percent` |
-| `reactivity` | `pcm` |
-| `temperature` | `degC` |
-
-Units are not free text. This is important for AI agents and future UI surfaces. A trend widget can distinguish percent from fraction. A control assistant can know that `rcpA.running` is boolean. A simulator can reject a command that writes `"open"` to a numeric valve position. A future unit conversion layer has structured input rather than prose.
-
-## Graph Compiler
-
-The graph compiler is the gate between scenario-authored configuration and runtime execution. It validates once, compiles once, and gives the runtime indexed structures so hot loops do not repeatedly parse strings. Runtime snapshots also include graph identity and the compiled variable path list; restore fails visibly if provider-private state no longer matches the compiled graph.
-
-Compilation performs these checks and transformations:
-
-1. Validate the raw graph schema.
-2. Reject duplicate component ids and connection ids.
-3. Resolve component kinds through the component registry.
-4. Validate component parameters and optional initial state.
-5. Parse compact port refs such as `sgA.primaryOutlet`.
-6. Validate referenced components and ports.
-7. Validate port compatibility and direction.
-8. Infer or validate process link kind.
-9. Compile component variables and link variables into one registry.
-10. Reject duplicate final variable paths.
-11. Validate published variables against compiled variables.
-12. Build indexed component and process-link tables.
-13. Group process links by link kind.
-
-```mermaid
-flowchart TD
-  Raw["Raw PlantGraphSpec JSON"] --> Schema["Schema validation"]
-  Schema --> Registry["Resolve component definitions"]
-  Registry --> Ports["Parse and validate port refs"]
-  Ports --> Kinds["Infer/validate link kinds"]
-  Kinds --> Variables["Compile variable registry"]
-  Variables --> Published["Validate published variables"]
-  Published --> Graph["CompiledPlantGraph"]
-  Graph --> Runtime["Fixed-step runtime"]
-```
-
-The result is a `CompiledPlantGraph`:
-
-```ts
-interface CompiledPlantGraph {
-  readonly specId: PlantGraphId
-  readonly title: string
-  readonly timestep: TimestepSpec
-  readonly components: ReadonlyArray<CompiledComponent>
-  readonly componentIndexById: ReadonlyMap<ComponentId, number>
-  readonly links: ReadonlyArray<CompiledProcessLink>
-  readonly linksByKind: Readonly<Record<ProcessLinkKind, ReadonlyArray<number>>>
-  readonly variables: ReadonlyArray<CompiledVariable>
-}
-```
-
-The compiled graph uses numeric component and link indices. That keeps the runtime deterministic and gives a path toward higher-performance representations later, such as typed arrays for hot numeric state, without changing scenario authoring.
-
-## Runtime Architecture
-
-The runtime is fixed-step and headless. It is created from a compiled process system. It owns one authoritative process variable table, applies queued commands at solver phase boundaries, advances deterministic solver phases, and returns snapshots.
-
-Current runtime modules:
-
-| Module | Responsibility |
-| --- | --- |
-| `runtime.ts` | Fixed-step orchestration, elapsed/remainder clock, solver phase order, public runtime API. |
-| `variable-table.ts` | Single authoritative variable map, command queue, writability/type checks, snapshots, published snapshots. |
-| `component-behaviors.ts` | Current component initialization and component solver behavior. |
-| `process-link-behaviors.ts` | Current process-link behavior such as flow, valve/leak modifiers, pressure, and radiation updates. |
-| `units.ts` | Canonical value conversion for structured units. |
-
-This split matters because it avoids duplicate state. Component behavior and link behavior do not maintain shadow state maps. They read and write through the variable table. The variable table is where unknown paths, non-writable writes, and wrong value types fail visibly.
-
-Future component behavior should stay inside this contract. A behavior declares its solver phase, local read surface, local write surface, and update function. The execution-plan compiler expands those declarations against the compiled graph once, validates that declared write variables exist, and then reuses the invocation list every tick. This means new behavior automatically gets slot-backed runtime storage, write validation, graph-restore checks, and deterministic fixed-step execution when it uses the standard behavior API.
-
-The practical authoring rules are: keep continuous physics in behavior modules rather than Leitbild events; declare every local output in `writes`; use compiled adjacency such as incoming and outgoing link indexes instead of scanning the graph in hot loops; cache only static graph-derived data; never cache process values outside the variable table; and add tests that prove the intended physical trend. This gives future AI and human contributors a narrow safe path without turning V1 into a general equation language or plugin runtime.
-
-```mermaid
-sequenceDiagram
-  participant Caller
-  participant Runtime
-  participant Table as Variable Table
-  participant Components as Component Behaviors
-  participant Links as Process-Link Behaviors
-
-  Caller->>Runtime: tick(elapsedMs)
-  Runtime->>Table: applyQueuedCommands()
-  Runtime->>Components: updateControlLogic(dt)
-  Runtime->>Components: solveElectrical(dt)
-  Runtime->>Components: solveFluidFlowComponents()
-  Runtime->>Links: solveFluidFlowLinks()
-  Runtime->>Components: solveThermalTransfer()
-  Runtime->>Components: updateComponentState(dt)
-  Runtime->>Links: updateProcessLinkState(dt)
-  Runtime->>Table: publishedSnapshot()
-  Table-->>Runtime: selected variables
-  Runtime-->>Caller: tick result
-```
-
-The phase order is currently:
-
-1. `applyCommands`
-2. `updateControlLogic`
-3. `solveFluidFlowComponents`
-4. `solveFluidFlowLinks`
-5. `solveThermalTransfer`
-6. `solveElectrical`
-7. `updateComponentState`
-8. `updateProcessLinkState`
-
-The phase names are intentionally explicit. They make the runtime auditable and testable. Future higher-fidelity components may need more sophisticated ordering, iterative convergence, or domain-specific subsolvers, but the core principle should remain: continuous process evolution belongs in ordered solver phases, not incidental event order.
-
-## Commands, Events, And Queries
-
-The current headless runtime accepts typed variable-write commands through its runtime API. A command targets a variable path and supplies a value. The variable table rejects unknown paths, non-writable variables, and type mismatches. This is the foundation for future UI controls and AI-agent actions.
-
-Leitbild events should represent discrete accepted history:
-
-- operator command accepted,
-- valve demand changed,
-- pump started or stopped,
-- reactor trip actuated,
-- alarm entered or cleared,
-- threshold crossed,
-- scenario fault injected,
-- plant mode changed.
-
-Continuous physics should not be emitted as event chatter. Internal high-frequency process state belongs in provider-private runtime state and snapshots. Selected variables can be published through snapshots, trends, surfaces, or pack queries.
-
-The pack query surface uses Leitbild's generic pack query route rather than a separate process-plant-specific HTTP family unless a new ADR approves that split. Current queries include:
-
+- `process-plant.systems.list`
+- `process-plant.graph.read`
 - `process-plant.variables.read`
 - `process-plant.variables.search`
-- `process-plant.graph.read`
-- `process-plant.trends.read`
 - `process-plant.runtime.status`
-- `process-plant.systems.list`
 - `process-plant.telemetry.published`
+- `process-plant.trends.read`
 
-Candidate future queries include:
-
-- `process-plant.alarms.list`
-
-Candidate commands include:
+Implemented command:
 
 - `process-plant.control.write`
-- `process-plant.control.operate`
-- `process-plant.alarm.acknowledge`
-- `process-plant.scenario.injectFault`
 
-The important rule for AI agents is that suggested actions are not plant truth until they are accepted through the command surface and committed by the runtime/provider.
+This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 
-Timed process actions are configured inside `providerConfigs["process-plant"]`, not in the generic Leitbild scenario script. That is intentional: a pump trip, valve write, or rod movement is process-plant language. Core scenario scripting should not become a hidden process-control DSL.
+## Multi-System Runs
 
-```json
-{
-  "providerConfigs": {
-    "process-plant": {
-      "systems": {
-        "unit-2": {
-          "telemetry": {
-            "sampleIntervalMs": 5000,
-            "variables": ["core.powerMw", "sgA.levelPercent", "turbine.electricMw"]
-          },
-          "schedule": {
-            "actions": [
-              {
-                "id": "unit-2-rcp-a-trip",
-                "atMs": 60000,
-                "type": "setVariable",
-                "path": "rcpA.running",
-                "value": false
-              }
-            ]
-          }
-        }
-      }
-    }
-  }
-}
+A scenario can instantiate multiple process systems using the same graphRef or different graphRefs. There is no special fleet runtime. Each system has its own compiled runtime, variable table, schedule, telemetry recorder, and provider-private snapshot. The six-unit benchmark is just a measurement fixture, not a design limit.
+
+![Six-unit process benchmark](../assets/process-plant-six-unit-trace.svg)
+
+The current six-system benchmark runs six expanded plant graphs independently for five simulated minutes with different scheduled faults. It demonstrates that the architecture can support multi-unit use cases such as SMR clusters without duplicating graph definitions inline. The benchmark script reports machine metadata and realtime factor so local and deployed performance can be compared.
+
+## Acceptance Traces
+
+The process-plant pack now has a dedicated acceptance trace harness:
+
+```sh
+bun run process-plant:acceptance
 ```
 
-## Surfaces And UI
+The harness compiles the real graphRef, runs six representative cases, samples selected telemetry, creates plots, and fails if high-level physical trend checks do not pass. The current cases are baseline, SGTR-like leak, loss of feedwater, RCP A trip, pressurizer relief opening, and turbine load reduction.
 
-A process plant surface is different from the current map surface. It may look like a control-room display: mimic diagrams, process trends, alarm lists, controls, procedure panes, parameter cards, interlock status, and simulator controls. Leitbild's surface architecture should eventually allow a scenario to assemble one or more process surfaces alongside a map surface.
+![Process plant acceptance traces](../assets/process-plant-acceptance-traces.svg)
 
-The process-plant pack should not force every plant into the same display. A hospital utility plant, chemical process, and nuclear plant may need different mimic diagrams. The shared layer is the compiled process graph and variable registry. A surface can bind display widgets to stable variable paths.
+Acceptance traces are not proof of engineering fidelity. They are regression guardrails. They make sure that a physics change does not accidentally remove SGTR leak/radiation coupling, break feedwater-level response, make pump coastdown instantaneous, disconnect relief flow from pressurizer steam mass, or leave turbine output insensitive to load demand.
 
-```mermaid
-flowchart LR
-  Variables["Variable registry"] --> Trends["Trend widgets"]
-  Variables --> Mimic["Process mimic diagram"]
-  Variables --> Alarms["Alarm list"]
-  Variables --> Controls["Control widgets"]
-  Variables --> Agents["AI assistant context"]
-  Controls --> Commands["Typed commands"]
-  Commands --> Runtime["Process runtime"]
-```
+## Authoring Guidance For Humans And AI Agents
 
-The first process-control UI should probably be narrow and practical: a headless runtime inspector, a variable table, a small trend panel, and a simple mimic of the example graph. A polished control-room surface can come later once provider lifecycle, snapshot/restore, and pack queries are settled.
+When authoring a process scenario, start with the operational purpose. Decide what must be observable, controllable, and faultable. Then choose a graphRef or define an inline graph. Publish only variables that surfaces, agents, tests, or study instrumentation need. Use link-local variables for simple sensors, valve positions, leaks, and radiation monitors on one connection. Use components for items with multiple ports, independent state, or rich internal behavior.
 
-## AI Agent Use
+Do not use process events for continuous physics. Do not turn every process variable into an operational object. Do not add arbitrary scenario-authored equations. Do not use free-text units. Do not create a new solver model without a compiler contract and tests. Do not deepen physics without a trend-level test or acceptance trace showing the intended behavior.
 
-The process-plant pack is intentionally AI-friendly. Its core artifacts are structured and inspectable:
+## Specification Summary
 
-- scenario-owned graph JSON,
-- component kinds and labels,
-- typed ports,
-- typed process links,
-- stable variable paths,
-- structured quantities and units,
-- writable flags,
-- publish policies,
-- sensor and actuator ids,
-- Mermaid diagrams generated from the graph.
+Important data types and concepts:
 
-An AI agent can read a graph, identify available controls, inspect published variables, look up a procedure, and propose an action in terms of variable paths. For example, an agent can explain that `sg-a-steam-to-msiv-a.valve.positionFraction` is writable and that reducing it should lower main steam flow, but that `sg-a-steam-to-msiv-a.pressureMPa` is telemetry and cannot be written directly.
+- `PlantGraphSpec`: canonical graph data.
+- `ComponentInstanceSpec`: scenario-defined component instance.
+- `ConnectionSpec`: scenario-defined typed connection/process link.
+- `ProcessLinkVariableDescriptor`: link-local process variable.
+- `CompiledPlantGraph`: runtime-ready indexed graph.
+- `ProcessPlantRuntime`: fixed-step runtime.
+- `ProcessPlantVariableSnapshot`: typed variable readout.
+- `ProcessPlantScheduleConfig`: pack-owned timed actions.
+- `ProcessPlantTelemetryConfig`: pack-owned trend sampling.
 
-Agents must not assume hidden physics beyond the implemented component and link behavior. If a variable is not published or a component does not model a phenomenon, the agent should say that the current simulator does not expose that state. This is especially important for nuclear examples: the current runtime is a medium-fidelity research prototype, not an engineering analysis code.
+Important files in the Leitbild repo:
 
-## Specification Reference
+- `src/packs/process-plant/graph/model.ts`
+- `src/packs/process-plant/graph/compiler.ts`
+- `src/packs/process-plant/graph/link-contracts.ts`
+- `src/packs/process-plant/graph/component-registry.ts`
+- `src/packs/process-plant/specs/pressurized-water-reactor.graph.json`
+- `src/packs/process-plant/runtime/runtime.ts`
+- `src/packs/process-plant/runtime/component-behaviors.ts`
+- `src/packs/process-plant/runtime/process-link-behaviors.ts`
+- `src/packs/process-plant/runtime/link-flow-helpers.ts`
+- `src/packs/process-plant/runtime/thermophysics.ts`
+- `scripts/process-plant/acceptance-traces.ts`
+- `scripts/process-plant/six-unit-benchmark.ts`
 
-### `PlantGraphSpec`
+## Next Work
 
-```ts
-interface PlantGraphSpec {
-  readonly schemaVersion: 1
-  readonly id: PlantGraphId
-  readonly title: string
-  readonly timestep: TimestepSpec
-  readonly components: ReadonlyArray<ComponentInstanceSpec>
-  readonly connections: ReadonlyArray<ConnectionSpec>
-  readonly publishedVariables: ReadonlyArray<VariablePath>
-}
-```
+The strongest next step is not a bigger UI yet. The pack should first finish the current physical-depth phase: make remaining feedwater/condensate behavior more persuasive, strengthen primary pressure/inventory edge cases, add more conservative energy/mass checks where needed, and keep extracting shared physics helpers when formulas recur. After that, the project can widen the component library and add more plant systems. Control/protection logic, alarms, procedures, and process-control surfaces should follow once the physical substrate is stable enough.
 
-### `TimestepSpec`
-
-```ts
-interface TimestepSpec {
-  readonly fixedStepMs: number
-}
-```
-
-`fixedStepMs` must be a positive integer and currently cannot exceed 10 seconds. The example graph uses 100 ms.
-
-### `ConnectionSpec`
-
-```ts
-interface ConnectionSpec {
-  readonly id: ConnectionId
-  readonly from: PortRef
-  readonly to: PortRef
-  readonly connectionKind: ConnectionKind
-  readonly service?: ConnectionService
-  readonly nominalFluid?: FluidKind
-  readonly designPhase?: DesignPhase
-  readonly solverModel?: FluidSolverModel
-  readonly physical?: ConnectionPhysicalSpec
-  readonly variables?: ReadonlyArray<ProcessLinkVariableDescriptor>
-}
-```
-
-`from` and `to` use compact port refs in the form `componentId.portName`. These refs are parsed by the compiler and should not be repeatedly parsed by the runtime. `connectionKind` is explicit and validated against the two typed ports. Fluid connections require a `service`, which is the main solver/query grouping.
-
-### `ConnectionPhysicalSpec`
-
-```ts
-interface ConnectionPhysicalSpec {
-  readonly lengthM?: number
-  readonly diameterM?: number
-  readonly roughnessM?: number
-  readonly volumeM3?: number
-  readonly nominalResistance?: number
-}
-```
-
-All physical values are optional. A link can be pure topology. Add physical metadata only when behavior, display, or AI interpretation needs it.
-
-### `ProcessLinkVariableDescriptor`
-
-```ts
-interface ProcessLinkVariableDescriptor {
-  readonly path: LocalVariablePath
-  readonly label: string
-  readonly kind: VariableKind
-  readonly domain: VariableDomain
-  readonly writable: boolean
-  readonly publish: VariablePublishPolicy
-  readonly quantity: ProcessQuantity
-  readonly unit: ProcessUnit
-  readonly initialValue: number | boolean
-  readonly sensorId?: string
-  readonly actuatorId?: string
-}
-```
-
-The `path` is local to the connection in the scenario file. The compiler turns it into a full path by prefixing the connection id.
-
-### `CompiledVariable`
-
-```ts
-interface CompiledVariable {
-  readonly path: VariablePath
-  readonly owner:
-    | { readonly type: "component"; readonly componentIndex: number }
-    | { readonly type: "link"; readonly linkIndex: number }
-  readonly descriptor: VariableDescriptor
-  readonly published: boolean
-  readonly initialValue?: number | boolean
-}
-```
-
-The owner tells the runtime whether the variable belongs to a component or a process link. It uses numeric indices, not raw string refs.
-
-## Current Example System
-
-The current built-in graph is `process-plant.pressurized-water-reactor.v1`. It includes:
-
-- a reactor core with fission power, decay heat, fuel temperature, coolant inlet/outlet temperature, reactivity, and rod insertion fraction,
-- four steam generators with level, pressure, primary inlet/outlet temperature, tube-metal temperature, secondary temperature, heat transfer, boiling rate, steam production, steam quality, feedwater inflow, and secondary inventory,
-- a reactor coolant pump with running state, speed fraction, and flow,
-- main and auxiliary feedwater pumps with running state, speed fraction, bounded flow response, and flow,
-- a turbine load sink with electrical output and load fraction,
-- a pressurizer with pressure, level, inventory, water and steam temperatures, heater demand, spray demand, relief valve position, and relief flow,
-- primary coolant, feedwater, auxiliary feedwater, main steam, exhaust steam, condensate, charging, letdown, and relief process links,
-- a rich main steam process link with flow, pressure, radiation, valve position, and leak area variables.
-
-The runtime behavior is intentionally simple, but now has a coherent primary-to-secondary spine. Reactor fission power trends toward a target based on rod insertion and reactivity; decay heat and fuel temperature evolve as explicit state. Pump flow follows running state and speed, and feedwater-related pumps can declare bounded flow response so feedwater does not appear or vanish as an infinite actuator. Reactor coolant pumps can also declare a `primaryLoopId`, which makes the pump the authoritative owner of `loopFlowTargetKgPerS`, `loopFlowKgPerS`, and `developedHeadPa` for that primary loop. The compiler validates one pump inlet, one pump outlet, one core-to-steam-generator hot leg, and one pump-to-core cold leg for every declared primary loop. Primary-coolant links on the loop read that loop-flow state, so an RCP trip produces loop-specific coastdown instead of an instant flow collapse. Reactor heat raises coolant outlet temperature with a lumped `Q = m * cp * dT` approximation. Steam-generator heat transfer depends on primary flow, primary temperature, tube-metal temperature, secondary temperature, level, and recirculation ratio. Secondary boiling rate is derived from heat transfer; steam quality trends from boiling capacity versus outgoing steam demand; secondary inventory is a bounded mass-balance state driven by incoming feedwater and outgoing steam flow. Process tanks track inventory, level, temperature, makeup, and available outlet flow, so feedwater and auxiliary-feedwater tanks are no longer infinite sources. The condenser converts turbine exhaust steam into condensate production, tracks condensate inventory and level, and exposes available condensate outlet flow to the condensate pumps. Pump suction links are demand-limited by the destination pump flow, so a stopped pump does not passively drain a source tank or condenser inventory. Pressurizer heaters, spray, and relief flow change pressure and inventory through ordinary component behavior. Main steam pressure is propagated from the relevant source steam generator where possible instead of using one global steam pressure for every line. The main steam link flow responds to demand, valve position, and leak area. Link radiation responds to leak state.
-
-The shared approximate thermophysical helpers live in the Leitbild repo at `src/packs/process-plant/runtime/thermophysics.ts`. They provide reviewed constants and formulas for water heat capacity, latent heat, heat/flow temperature rise, steam production from heat, saturation-temperature approximation, and a small energy-balance step. Future component behavior should reuse or extend this helper layer rather than duplicating constants in individual behavior functions.
-
-This is not a physical simulator that should be used for engineering conclusions. It is a feasibility model for Leitbild's component graph, variable table, process-link semantics, and fixed-step runtime.
-
-## What To Build Next
-
-The next work should strengthen the process-plant pack without jumping prematurely to a large control-room UI.
-
-Recommended sequence:
-
-1. Harden the telemetry substrate into a long-run trend surface: retention policy, sampling groups, query windows, CSV export, and clear memory behavior for multi-hour runs.
-2. Add alarm definitions and threshold crossing events for the current component/link variable registry.
-3. Add a minimal process surface: variable table, published telemetry, writable controls, trend panels, and generated graph diagram.
-4. Strengthen component behavior for the primary/secondary loop: feedwater inventory source/sink behavior, richer steam-generator shrink/swell and trip behavior, and eventually a solved primary pressure field that uses the pressurizer state.
-5. Add richer process-link hydraulics only when the current service/link abstraction is insufficient for a concrete scenario.
-
-Avoid adding arbitrary user-authored equations in v1. They are powerful, but they open a much larger safety, validation, determinism, and debugging problem. A better early path is scenario-authored topology plus code-backed, tested component definitions.
-
-## Guardrails
-
-- Do not model continuous process physics through the interaction event bus.
-- Do not turn process variables into `OperationalObject`s.
-- Do not add process-plant-specific HTTP endpoint families without a new architecture decision.
-- Do not make Mermaid canonical.
-- Do not make a TypeScript plant graph the runtime source of truth when scenario/config data can define the graph.
-- Do not add placeholder component behavior. If a component behavior exists, it must be real enough to test.
-- Do not use free-text units.
-- Do not put unrelated behavior into process links. A process-link variable should observe or modify that one link.
-- Do not hide failed graph validation behind silent fallback or auto-repair.
-
-Related pages: [[concepts]], [[specs]], [[simulation-technologies]], [[future-projects]], [[adrs/0017-process-plant-component-graph]].
