@@ -275,9 +275,20 @@ Exactly one of `path` or `tagId` is allowed. Unknown tags, unknown paths, and no
 
 ## Control And Protection Substrate
 
-The control/protection substrate is deterministic pack-owned behavior for alarms, trips, and automatic variable writes. It is intentionally not a general scripting engine and not an emergency procedure interpreter.
+The control/protection substrate is deterministic pack-owned behavior for process-plant instrumentation and control. It is intentionally not a general scripting engine, not an emergency procedure interpreter, and not a second physics solver. It sits above continuous physics: the runtime computes mass, energy, pressure, flow, and equipment state; the I&C substrate observes the authoritative variable table through signal bindings, interprets conditions, and emits constrained actions.
 
-Rules read signal snapshots and evaluate typed declarative conditions: comparison, `all`, `any`, `not`, simple voting, delay, latch, and reset-on-clear. Effects are constrained to alarm signals, trip signals, or validated writes queued for the next solver tick.
+The substrate has six semantic layers:
+
+- **Instrumentation signals** are graph-owned process variables used as indications, controller inputs, alarm inputs, procedure inputs, and AI-visible observations.
+- **Normal controllers** represent routine automatic control, such as pressure control, level control, flow control, pump speed control, valve positioning, heater/spray control, or turbine/load control.
+- **Protection functions** represent safety-like automatic behavior, such as reactor trip, isolation, relief, safeguard actuation, or equipment trip.
+- **Alarm and annunciator state** is persistent current truth plus transition events. An alarm can be active, acknowledged, cleared, latched, resettable, or suppressed. Acknowledgement means someone saw the alarm; it does not mean the plant condition cleared.
+- **Permissives and interlocks** constrain commands or automatic actions. A permissive must be true before an action can proceed. An interlock prevents, forces, or constrains equipment state.
+- **Validated actions** are the only way the substrate affects plant state: alarm/trip state transitions and queued writes to writable process signals.
+
+Rules read signal snapshots and evaluate typed declarative conditions: comparison, named condition truth, `all`, `any`, `not`, simple voting, delay, latch, and reset conditions. Effects are constrained to alarm state transitions, trip state transitions, or validated writes queued for the next solver tick.
+
+External procedure systems remain outside the process-plant pack for now. A procedure runner, human operator, or AI agent can ask for signal values, search procedure-relevant signals, ask whether a named condition is true, and issue validated commands. The procedure document, procedure branch state, and procedure execution policy belong to the external procedure runner or human/AI workflow, not to process-plant.
 
 The ordering is important:
 
@@ -290,7 +301,9 @@ The ordering is important:
 
 This means protection logic can react to process state without corrupting the continuous solver. The interaction bus carries discrete operator-facing signals; it is not used to move heat, mass, pressure, or flow.
 
-This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
+Automatic actions from normal controllers and protection functions use the same validation semantics as operator, scenario, and AI commands. They resolve a signal, check writability, validate type and hard limits, queue the write at a phase boundary, and fail visibly if the target is invalid. An internal actor such as `actor:process-plant-protection` may request an action, but it does not get a private mutation path.
+
+This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, inspect alarm/protection state, evaluate procedure-relevant conditions, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 
 ## Multi-System Runs
 

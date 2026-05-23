@@ -108,11 +108,22 @@ Compiled capabilities are `readable`, `writable`, `trendable`, `alarmable`, `ope
 
 ## Process Control/Protection Rule Spec
 
-Process control/protection rules are typed declarative data evaluated by the process-plant pack. They are not arbitrary expressions or generated code.
+Process control/protection rules are typed declarative data evaluated by the process-plant pack. They are the specification surface for the simplified process-plant I&C substrate. They are not arbitrary expressions, generated code, continuous physics, or embedded procedure execution.
+
+The I&C substrate uses this vocabulary:
+
+- **Instrumentation signal**: a graph-owned process variable exposed through signal binding metadata.
+- **Normal controller**: routine automatic control that may request validated writes.
+- **Protection function**: safety-like automatic response that may latch and may require reset conditions.
+- **Alarm state**: persistent current alarm truth plus transition events.
+- **Permissive**: a condition that must be true before a command/action may proceed.
+- **Interlock**: a condition that prevents, forces, or constrains equipment state.
+- **Validated action**: a constrained effect that goes through signal resolution, writability, type, hard-limit, and phase-boundary checks.
 
 Supported V1 condition forms:
 
 - comparison/equality against a signal value,
+- named condition truth,
 - `all`,
 - `any`,
 - `not`,
@@ -125,7 +136,7 @@ Supported effects:
 - emit trip interaction signal,
 - queue a validated variable write for the next solver tick.
 
-Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver.
+Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver. Procedure runners, operators, and AI agents should use this substrate by querying signal values and condition truth, then issuing commands through the generic command path. The process-plant pack must not own procedure document parsing or procedure branch state without a future ADR.
 
 ## Event Model Spec
 
