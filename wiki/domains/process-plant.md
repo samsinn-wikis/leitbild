@@ -215,8 +215,14 @@ Variable descriptors may declare:
 - `equipmentId`: the component or equipment reference associated with the signal.
 - `description`: a concise human/agent explanation.
 - `externalRefs`: optional stable references such as `process-plant://unit-1/pressurizer.pressureMPa`.
+- `capabilities`: optional operational visibility metadata when derived defaults are not enough.
+- `limits`: optional normal, operating, hard, and alarm ranges.
 
 `tagId` replaces the older sensor/actuator split. Readability and writability are not different namespaces; they are properties of the same compiled variable. If `writable` is `false`, command attempts fail explicitly.
+
+Capabilities are compiled from existing descriptor data. By default a variable is readable; it is writable if the descriptor says so; it is trendable if it is published to telemetry, alarm, or Leitbild; it is procedure-relevant and AI-visible when it has a `tagId`. Explicit overrides should be rare and should carry operational value. Leitbild rejects a tagged variable that is hidden from operators, AI agents, and procedures.
+
+Limits have a sharper role. `hardRange` is enforced by the runtime and rejects invalid writes or restored values. Normal ranges, operating ranges, and alarm limits are interpretation metadata for UI displays, procedure reasoning, AI monitoring, and future protection-rule authoring. Do not add arbitrary hard limits to generic flow or inventory variables; use hard limits when the component design gives a real bound, such as a 0..1 valve position or a declared equipment control limit.
 
 Component variable tags are declared on the component instance because the reusable component type should not hardcode plant-specific tag names:
 

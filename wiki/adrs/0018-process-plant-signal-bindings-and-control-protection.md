@@ -17,6 +17,8 @@ Process-plant signal identity is graph-owned metadata compiled into each process
 
 The process-plant compiler builds indexes by variable path and tag id. Pack queries can resolve, search, and read signals, and commands can write by either variable path or tag id. API calls must include `systemId`; Leitbild does not infer a current unit.
 
+Compiled signal bindings also carry operational capability metadata and optional variable limits. Capability defaults are derived from `writable`, `publish`, and `tagId`; explicit overrides are graph metadata and should be used only when they clarify a real operational surface. `hardRange` is enforced during writes and restore validation. Normal, operating, and alarm ranges are interpretation data for humans, UI, procedures, AI agents, and future protection rules.
+
 Control/protection logic is deterministic, typed, pack-owned behavior. It reads completed tick snapshots, evaluates declarative conditions, queues validated writes for the next solver tick, and emits alarm/trip interaction signals. It does not execute arbitrary scenario code and does not move continuous physics over the event bus.
 
 ## Consequences

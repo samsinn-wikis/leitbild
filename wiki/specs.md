@@ -97,8 +97,14 @@ Allowed signal metadata fields:
 - `equipmentId`: equipment or component reference.
 - `description`: short explanation.
 - `externalRefs`: optional stable external references.
+- `capabilities`: compiled/overridden operational visibility metadata.
+- `limits`: optional normal, operating, hard, and alarm ranges.
 
 `tagId` replaces separate sensor/actuator namespaces. Writability is the variable descriptor's `writable` flag.
+
+Compiled capabilities are `readable`, `writable`, `trendable`, `alarmable`, `operatorFacing`, `aiVisible`, and `procedureRelevant`. Defaults come from `writable`, `publish`, and `tagId`; overrides should be used only when the default would misrepresent the operational surface.
+
+`hardRange` is enforced by the runtime. Other ranges and alarm limits are interpretation metadata. This distinction keeps safety validation real without turning every generic process value into an arbitrary bounded variable.
 
 ## Process Control/Protection Rule Spec
 

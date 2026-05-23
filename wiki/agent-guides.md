@@ -39,7 +39,7 @@ Before calling an action endpoint, the agent should have a recent snapshot and k
 
 For read-only pack-owned computations, use the generic pack query API rather than guessing from visible UI. Pack queries are appropriate for weather at a point or along a route, traffic conditions intersecting a route, and ambulance dispatch summaries. Queries are read-only and should be preferred before recommendations that depend on provider-private state.
 
-For process-plant procedures, resolve procedure tags through the process-plant signal query surface. Use `process-plant.signals.read` with an explicit `systemId` and one or more `{ "tagId": "..." }` references. Do not assume a current unit, do not infer tags from labels, and do not use fleet-wide shortcuts. If you need to change a writable process value, use `process-plant.control.write` with exactly one reference form: either `path` or `tagId`.
+For process-plant procedures, resolve procedure tags through the process-plant signal query surface. Use `process-plant.signals.read` with an explicit `systemId` and one or more `{ "tagId": "..." }` references. Do not assume a current unit, do not infer tags from labels, and do not use fleet-wide shortcuts. Check the returned signal capabilities before treating a value as procedure-relevant, trendable, alarmable, or writable. If you need to change a writable process value, use `process-plant.control.write` with exactly one reference form: either `path` or `tagId`; writes outside declared hard ranges are rejected.
 
 Do not treat pack queries as commands. A query can reveal that a route crosses rain-affected H3 cells or traffic slowdowns; a command is still required to change an ambulance destination, reset a run, or create/delete an object.
 
