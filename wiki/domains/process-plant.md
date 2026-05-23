@@ -132,7 +132,9 @@ Current fluid links declare `connectionKind`, `service`, `nominalFluid`, `design
       "quantity": "flowRate",
       "unit": "kg/s",
       "initialValue": 0,
-      "sensorId": "FT-SG-A-001"
+      "tagId": "FT-SG-A-001",
+      "equipmentId": "sgA",
+      "description": "Main steam flow from steam generator A"
     },
     {
       "path": "valve.positionFraction",
@@ -144,7 +146,9 @@ Current fluid links declare `connectionKind`, `service`, `nominalFluid`, `design
       "quantity": "ratio",
       "unit": "fraction",
       "initialValue": 1,
-      "actuatorId": "MSIV-A"
+      "tagId": "MSIV-A",
+      "equipmentId": "mainSteamIsolationValveA",
+      "description": "Main steam isolation valve A position"
     }
   ]
 }
@@ -181,13 +185,104 @@ Implemented queries include:
 - `process-plant.graph.read`
 - `process-plant.variables.read`
 - `process-plant.variables.search`
+- `process-plant.signals.resolve`
+- `process-plant.signals.read`
+- `process-plant.signals.search`
 - `process-plant.runtime.status`
 - `process-plant.telemetry.published`
 - `process-plant.trends.read`
+- `process-plant.protection.status`
 
 Implemented command:
 
 - `process-plant.control.write`
+
+## Signal Bindings For Procedures And AI Agents
+
+Process signal bindings are the bridge between internal process variables and procedure language. A signal binding is not a second state store. It is graph-owned metadata attached to the variable that already exists in the compiled runtime.
+
+The authoritative identity of a signal is:
+
+```text
+{ controlRunId, systemId, variablePath }
+```
+
+`systemId` is always explicit. Leitbild does not assume a "current unit" and does not introduce fleet-wide aliases. This is deliberate: a future scenario may run one plant, six similar plants, or several unrelated process systems. A tag such as `PT-455` can exist in more than one system, and API calls remain unambiguous because they include the system id.
+
+Variable descriptors may declare:
+
+- `tagId`: a procedure-facing tag such as `PT-455`, `SG-A-LVL-NR`, or `PORV-456A`.
+- `equipmentId`: the component or equipment reference associated with the signal.
+- `description`: a concise human/agent explanation.
+- `externalRefs`: optional stable references such as `process-plant://unit-1/pressurizer.pressureMPa`.
+
+`tagId` replaces the older sensor/actuator split. Readability and writability are not different namespaces; they are properties of the same compiled variable. If `writable` is `false`, command attempts fail explicitly.
+
+Component variable tags are declared on the component instance because the reusable component type should not hardcode plant-specific tag names:
+
+```json
+{
+  "id": "pressurizer",
+  "kind": "pressurizer",
+  "label": "Pressurizer",
+  "parameters": {},
+  "variables": [
+    {
+      "path": "pressureMPa",
+      "tagId": "PT-455",
+      "equipmentId": "pressurizer",
+      "description": "Pressurizer pressure"
+    }
+  ]
+}
+```
+
+Link variable tags live directly on the link-local variable because link variables already belong to one graph connection. The compiler validates that tag ids are unique inside one process system and that component variable overlays point at real local variable paths.
+
+Agents can resolve or read procedure tags directly:
+
+```json
+{
+  "packId": "process-plant",
+  "kind": "process-plant.signals.read",
+  "payload": {
+    "systemId": "unit-1",
+    "signals": [{ "tagId": "PT-455" }]
+  }
+}
+```
+
+Commands use the same reference shape:
+
+```json
+{
+  "kind": "process-plant.control.write",
+  "payload": {
+    "systemId": "unit-1",
+    "tagId": "PORV-456A",
+    "value": 1
+  }
+}
+```
+
+Exactly one of `path` or `tagId` is allowed. Unknown tags, unknown paths, and non-writable targets are explicit failures.
+
+## Control And Protection Substrate
+
+The control/protection substrate is deterministic pack-owned behavior for alarms, trips, and automatic variable writes. It is intentionally not a general scripting engine and not an emergency procedure interpreter.
+
+Rules read signal snapshots and evaluate typed declarative conditions: comparison, `all`, `any`, `not`, simple voting, delay, latch, and reset-on-clear. Effects are constrained to alarm signals, trip signals, or validated writes queued for the next solver tick.
+
+The ordering is important:
+
+1. external and previously queued writes apply at the runtime phase boundary,
+2. continuous physics solver phases run,
+3. control/protection rules evaluate against the completed tick snapshot,
+4. rule writes are queued for the next tick,
+5. alarm/trip interaction signals are emitted,
+6. telemetry is recorded.
+
+This means protection logic can react to process state without corrupting the continuous solver. The interaction bus carries discrete operator-facing signals; it is not used to move heat, mass, pressure, or flow.
 
 This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 
@@ -251,4 +346,3 @@ Important files in the Leitbild repo:
 ## Next Work
 
 The strongest next step is not a bigger UI yet. The pack should first finish the current physical-depth phase: make remaining feedwater/condensate behavior more persuasive, strengthen primary pressure/inventory edge cases, add more conservative energy/mass checks where needed, and keep extracting shared physics helpers when formulas recur. After that, the project can widen the component library and add more plant systems. Control/protection logic, alarms, procedures, and process-control surfaces should follow once the physical substrate is stable enough.
-

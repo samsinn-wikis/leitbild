@@ -69,7 +69,57 @@ Current traffic queries:
 - `traffic.condition`: return one traffic condition by id.
 - `traffic.conditionsForRoute`: return route-relevant traffic conditions that intersect or affect a route geometry.
 
+Current process-plant queries:
+
+- `process-plant.systems.list`: list active process systems.
+- `process-plant.graph.read`: return compiled graph topology and signal metadata.
+- `process-plant.variables.read`: read current variable snapshots by variable path.
+- `process-plant.variables.search`: search variable snapshots by text, domain, quantity, and publication policy.
+- `process-plant.signals.resolve`: resolve `{path}` or `{tagId}` references inside an explicit `systemId`.
+- `process-plant.signals.read`: resolve signals and return current variable snapshots.
+- `process-plant.signals.search`: search signal bindings by tag, equipment, text, domain, quantity, writability, and publication policy.
+- `process-plant.runtime.status`: summarize process runtime status.
+- `process-plant.telemetry.published`: return currently published telemetry variables.
+- `process-plant.trends.read`: read configured trend buffers.
+- `process-plant.protection.status`: read configured protection-rule state.
+
 Agents should use pack queries when they need provider-owned read data. They should still use snapshots/object reads for canonical projected objects and command endpoints for changes.
+
+## Process Signal Binding Spec
+
+Process signal bindings are graph-owned metadata attached to component and link variables. They expose process values to humans, procedures, AI agents, and control-room surfaces without creating a separate binding catalog.
+
+The authoritative runtime identity is `{controlRunId, systemId, variablePath}`. Procedure-facing tags are optional aliases inside one process system. Every API read/write that uses a tag must include `systemId`.
+
+Allowed signal metadata fields:
+
+- `tagId`: compact procedure/operator tag such as `PT-455`.
+- `equipmentId`: equipment or component reference.
+- `description`: short explanation.
+- `externalRefs`: optional stable external references.
+
+`tagId` replaces separate sensor/actuator namespaces. Writability is the variable descriptor's `writable` flag.
+
+## Process Control/Protection Rule Spec
+
+Process control/protection rules are typed declarative data evaluated by the process-plant pack. They are not arbitrary expressions or generated code.
+
+Supported V1 condition forms:
+
+- comparison/equality against a signal value,
+- `all`,
+- `any`,
+- `not`,
+- simple voting,
+- delay/latch/reset metadata.
+
+Supported effects:
+
+- emit alarm interaction signal,
+- emit trip interaction signal,
+- queue a validated variable write for the next solver tick.
+
+Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver.
 
 ## Event Model Spec
 

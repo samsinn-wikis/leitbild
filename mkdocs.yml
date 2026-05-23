@@ -97,6 +97,7 @@ nav:
     - H3 Spatial Field Index: adrs/0015-h3-spatial-field-index.md
     - Generic Pack Query Surface: adrs/0016-generic-pack-query-surface.md
     - Process Plant Component Graph: adrs/0017-process-plant-component-graph.md
+    - Process Plant Signal Bindings And Control Protection: adrs/0018-process-plant-signal-bindings-and-control-protection.md
   - Source map: source-map.md
   - Simulation technologies: simulation-technologies.md
   - Future projects: future-projects.md
