@@ -188,14 +188,16 @@ Implemented queries include:
 - `process-plant.signals.resolve`
 - `process-plant.signals.read`
 - `process-plant.signals.search`
+- `process-plant.conditions.evaluate`
 - `process-plant.runtime.status`
 - `process-plant.telemetry.published`
 - `process-plant.trends.read`
-- `process-plant.protection.status`
+- `process-plant.ic.status`
 
-Implemented command:
+Implemented commands:
 
 - `process-plant.control.write`
+- `process-plant.ic.acknowledge`
 
 ## Signal Bindings For Procedures And AI Agents
 
@@ -286,9 +288,9 @@ The substrate has six semantic layers:
 - **Permissives and interlocks** constrain commands or automatic actions. A permissive must be true before an action can proceed. An interlock prevents, forces, or constrains equipment state.
 - **Validated actions** are the only way the substrate affects plant state: alarm/trip state transitions and queued writes to writable process signals.
 
-Rules read signal snapshots and evaluate typed declarative conditions: comparison, named condition truth, `all`, `any`, `not`, simple voting, delay, latch, and reset conditions. Effects are constrained to alarm state transitions, trip state transitions, or validated writes queued for the next solver tick.
+Rules read signal snapshots and evaluate typed declarative conditions: comparison, `all`, `any`, `not`, simple voting, delay, latch, reset-on-clear, and explicit reset conditions. Effects are constrained to `alarm.enter`, `trip.enter`, or `writeSignal`. Alarm and trip effects create persistent lifecycle state as well as transition events; write effects resolve a signal and queue a validated runtime write for the next solver tick.
 
-External procedure systems remain outside the process-plant pack for now. A procedure runner, human operator, or AI agent can ask for signal values, search procedure-relevant signals, ask whether a named condition is true, and issue validated commands. The procedure document, procedure branch state, and procedure execution policy belong to the external procedure runner or human/AI workflow, not to process-plant.
+External procedure systems remain outside the process-plant pack for now. A procedure runner, human operator, or AI agent can ask for signal values, search procedure-relevant signals, ask whether a condition is true, and issue validated commands. The procedure document, procedure branch state, and procedure execution policy belong to the external procedure runner or human/AI workflow, not to process-plant. `process-plant.conditions.evaluate` is the procedure-facing truth surface: it evaluates the same typed condition shape used by I&C rules and returns both the boolean result and the signals read, including all children of compound conditions.
 
 The ordering is important:
 
@@ -302,6 +304,8 @@ The ordering is important:
 This means protection logic can react to process state without corrupting the continuous solver. The interaction bus carries discrete operator-facing signals; it is not used to move heat, mass, pressure, or flow.
 
 Automatic actions from normal controllers and protection functions use the same validation semantics as operator, scenario, and AI commands. They resolve a signal, check writability, validate type and hard limits, queue the write at a phase boundary, and fail visibly if the target is invalid. An internal actor such as `actor:process-plant-protection` may request an action, but it does not get a private mutation path.
+
+Current alarm/trip truth is read through `process-plant.ic.status`. The status contains rule snapshots, alarm lifecycle states, trip lifecycle states, and visible failures from invalid rule/effect evaluation. Acknowledgement is an explicit `process-plant.ic.acknowledge` command with `systemId` and `lifecycleId`; acknowledgement records that an operator or agent has seen the state, but it does not clear the condition or mutate plant physics.
 
 This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, inspect alarm/protection state, evaluate procedure-relevant conditions, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 

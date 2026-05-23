@@ -78,10 +78,16 @@ Current process-plant queries:
 - `process-plant.signals.resolve`: resolve `{path}` or `{tagId}` references inside an explicit `systemId`.
 - `process-plant.signals.read`: resolve signals and return current variable snapshots.
 - `process-plant.signals.search`: search signal bindings by tag, equipment, text, domain, quantity, writability, and publication policy.
+- `process-plant.conditions.evaluate`: evaluate a typed I&C condition for one process system and return both truth and signals read.
 - `process-plant.runtime.status`: summarize process runtime status.
 - `process-plant.telemetry.published`: return currently published telemetry variables.
 - `process-plant.trends.read`: read configured trend buffers.
-- `process-plant.protection.status`: read configured protection-rule state.
+- `process-plant.ic.status`: read current I&C rule, alarm, trip, and failure state.
+
+Current process-plant commands:
+
+- `process-plant.control.write`: queue a validated write to exactly one `{path}` or `{tagId}` inside one explicit `systemId`.
+- `process-plant.ic.acknowledge`: acknowledge one alarm/trip lifecycle id inside one explicit `systemId`.
 
 Agents should use pack queries when they need provider-owned read data. They should still use snapshots/object reads for canonical projected objects and command endpoints for changes.
 
