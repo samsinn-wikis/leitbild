@@ -16,9 +16,9 @@ Open [https://leitbild.samsinn.app/i/halden](https://leitbild.samsinn.app/i/hald
 ## Scenario Shape
 
 - Scenario id: `halden`
-- Packs: `ambulance`, `traffic`
+- Packs: `ambulance`, `traffic`, `weather`
 - Map center: `11.387, 59.1248`
-- Starting objects: 2 hospital, 3 ambulance, 2 incident, 1 traffic condition
+- Starting objects: 2 hospital, 3 ambulance, 2 incident, 1 weather condition, 1 traffic condition
 
 ## Source Of Truth
 
@@ -32,7 +32,7 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
   "schemaVersion": 1,
   "title": "Halden ambulance response",
   "description": "A compact Halden scenario for checking scenario switching, routed traffic, hospital capacity, and dispatch basics.",
-  "packs": ["ambulance", "traffic"],
+  "packs": ["ambulance", "traffic", "weather"],
   "providerOverrides": {},
   "world": {
     "startsAt": "2026-01-01T10:00:00.000Z",
@@ -105,6 +105,59 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
       "victims": { "state": "confirmed", "count": 2 }
     },
     {
+      "pack": "weather",
+      "type": "weather_condition",
+      "id": "weather:halden-coastal-showers",
+      "label": "Cool coastal showers",
+      "truthResolution": 8,
+      "showAffectedCells": true,
+      "priority": 5,
+      "summary": "Cool humid weather with intermittent light rain over central Halden",
+      "atmosphere": {
+        "airTemperatureC": 5,
+        "humidity": 0.86,
+        "windSpeedMps": 5.2,
+        "windDirectionDeg": 210,
+        "visibilityM": 9000,
+        "cloudCover": 0.82,
+        "precipitation": { "type": "rain", "intensityMmPerHour": 0.6 }
+      },
+      "surface": {
+        "groundTemperatureC": 4.5,
+        "wetness": 0.28,
+        "standingWater": 0.05,
+        "snow": 0,
+        "ice": 0,
+        "frost": 0
+      },
+      "keyframes": [
+        {
+          "atSeconds": 0,
+          "center": [11.3820, 59.1244],
+          "semiMajorAxisM": 3600,
+          "semiMinorAxisM": 1350,
+          "rotationDeg": 102,
+          "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.7, "y": 0.8 }, { "x": 1, "y": 0 }]
+        },
+        {
+          "atSeconds": 360,
+          "center": [11.4060, 59.1285],
+          "semiMajorAxisM": 4300,
+          "semiMinorAxisM": 1600,
+          "rotationDeg": 116,
+          "atmosphere": {
+            "precipitation": { "type": "rain", "intensityMmPerHour": 0.9 },
+            "visibilityM": 7600
+          },
+          "surface": {
+            "wetness": 0.38,
+            "standingWater": 0.07
+          },
+          "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.7, "y": 0.8 }, { "x": 1, "y": 0 }]
+        }
+      ]
+    },
+    {
       "pack": "traffic",
       "type": "traffic_condition",
       "id": "traffic:halden-center-slowdown",
@@ -121,7 +174,8 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
   "initialContexts": [],
   "providerConfigs": {
     "ambulance": {},
-    "traffic": {}
+    "traffic": {},
+    "weather": {}
   },
   "surface": {
     "schemaVersion": 1,
@@ -133,7 +187,7 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
         "config": {
           "center": [11.3870, 59.1248],
           "zoom": 13,
-          "layers": ["objects", "routes", "traffic", "highlights"]
+          "layers": ["objects", "routes", "weather", "traffic", "highlights"]
         }
       },
       {
@@ -146,6 +200,7 @@ This page is generated from `src/scenarios/halden.scenario.json` in the Leitbild
             { "categoryId": "hospitals", "visible": true, "collapsed": false, "visibleFields": ["trauma-beds"] },
             { "categoryId": "ambulances", "visible": true, "collapsed": false, "visibleFields": [] },
             { "categoryId": "incidents", "visible": true, "collapsed": false, "visibleFields": ["victims"] },
+            { "categoryId": "weather", "visible": true, "collapsed": false, "visibleFields": ["air-temperature", "precipitation", "surface"] },
             { "categoryId": "traffic", "visible": true, "collapsed": false, "visibleFields": ["severity", "reason"] }
           ]
         }

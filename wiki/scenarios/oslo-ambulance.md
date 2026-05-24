@@ -16,9 +16,9 @@ Open [https://leitbild.samsinn.app/i/oslo-ambulance](https://leitbild.samsinn.ap
 ## Scenario Shape
 
 - Scenario id: `oslo-ambulance`
-- Packs: `ambulance`, `traffic`
+- Packs: `ambulance`, `traffic`, `weather`
 - Map center: `10.7522, 59.9139`
-- Starting objects: 3 hospital, 3 ambulance, 3 incident, 1 traffic condition
+- Starting objects: 3 hospital, 3 ambulance, 3 incident, 2 weather condition, 1 traffic condition
 
 ## Source Of Truth
 
@@ -32,7 +32,7 @@ This page is generated from `src/scenarios/oslo-ambulance.scenario.json` in the 
   "schemaVersion": 1,
   "title": "Oslo ambulance tutorial",
   "description": "A timed Oslo ambulance dispatch scenario with existing transports, unresolved incidents, traffic conditions, and tutorial guidance.",
-  "packs": ["ambulance", "traffic"],
+  "packs": ["ambulance", "traffic", "weather"],
   "providerOverrides": {},
   "world": {
     "startsAt": "2026-01-01T09:00:00.000Z",
@@ -126,6 +126,101 @@ This page is generated from `src/scenarios/oslo-ambulance.scenario.json` in the 
       "victims": { "state": "confirmed", "count": 3 }
     },
     {
+      "pack": "weather",
+      "type": "weather_condition",
+      "id": "weather:oslo-damp-background",
+      "label": "Damp Oslo background",
+      "truthResolution": 8,
+      "showAffectedCells": false,
+      "priority": 0,
+      "summary": "Mild damp overcast background conditions across central Oslo",
+      "atmosphere": {
+        "airTemperatureC": 6,
+        "humidity": 0.78,
+        "windSpeedMps": 4,
+        "windDirectionDeg": 225,
+        "visibilityM": 11000,
+        "cloudCover": 0.76,
+        "precipitation": { "type": "none", "intensityMmPerHour": 0 }
+      },
+      "surface": {
+        "groundTemperatureC": 5.8,
+        "wetness": 0.18,
+        "standingWater": 0.02,
+        "snow": 0,
+        "ice": 0,
+        "frost": 0
+      },
+      "keyframes": [
+        {
+          "atSeconds": 0,
+          "center": [10.7522, 59.9250],
+          "semiMajorAxisM": 9000,
+          "semiMinorAxisM": 6500,
+          "rotationDeg": 15,
+          "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.85, "y": 1 }, { "x": 1, "y": 0.35 }]
+        }
+      ]
+    },
+    {
+      "pack": "weather",
+      "type": "weather_condition",
+      "id": "weather:oslo-moving-rain-band",
+      "label": "Moving rain band",
+      "truthResolution": 8,
+      "priority": 10,
+      "summary": "A narrow rain band moves east across Oslo and briefly lowers road friction",
+      "extensions": {
+        "research.operatorWeatherLoad": 0.35
+      },
+      "atmosphere": {
+        "airTemperatureC": 5.5,
+        "humidity": 0.9,
+        "windSpeedMps": 7,
+        "windDirectionDeg": 250,
+        "visibilityM": 6500,
+        "cloudCover": 0.9,
+        "precipitation": { "type": "rain", "intensityMmPerHour": 1.8 }
+      },
+      "surface": {
+        "groundTemperatureC": 5,
+        "wetness": 0.5,
+        "standingWater": 0.08,
+        "snow": 0,
+        "ice": 0,
+        "frost": 0
+      },
+      "keyframes": [
+        {
+          "atSeconds": 0,
+          "center": [10.6900, 59.9250],
+          "semiMajorAxisM": 5200,
+          "semiMinorAxisM": 1200,
+          "rotationDeg": 68,
+          "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.65, "y": 0.85 }, { "x": 1, "y": 0 }]
+        },
+        {
+          "atSeconds": 420,
+          "center": [10.8350, 59.9270],
+          "semiMajorAxisM": 6800,
+          "semiMinorAxisM": 1500,
+          "rotationDeg": 78,
+          "atmosphere": {
+            "precipitation": { "type": "rain", "intensityMmPerHour": 2.3 },
+            "visibilityM": 5200
+          },
+          "surface": {
+            "wetness": 0.62,
+            "standingWater": 0.12
+          },
+          "extensions": {
+            "research.operatorWeatherLoad": 0.65
+          },
+          "falloffCurve": [{ "x": 0, "y": 1 }, { "x": 0.65, "y": 0.85 }, { "x": 1, "y": 0 }]
+        }
+      ]
+    },
+    {
       "pack": "traffic",
       "type": "traffic_condition",
       "id": "traffic:ring2-slowdown",
@@ -142,7 +237,20 @@ This page is generated from `src/scenarios/oslo-ambulance.scenario.json` in the 
   "initialContexts": [],
   "providerConfigs": {
     "ambulance": {},
-    "traffic": {}
+    "traffic": {},
+    "weather": {
+      "fields": {
+        "extensions": {
+          "research.operatorWeatherLoad": {
+            "type": "number",
+            "unit": "0..1",
+            "default": 0,
+            "min": 0,
+            "max": 1
+          }
+        }
+      }
+    }
   },
   "surface": {
     "schemaVersion": 1,
@@ -154,7 +262,7 @@ This page is generated from `src/scenarios/oslo-ambulance.scenario.json` in the 
         "config": {
           "center": [10.7522, 59.9139],
           "zoom": 12,
-          "layers": ["objects", "routes", "traffic", "highlights"]
+          "layers": ["objects", "routes", "weather", "traffic", "highlights"]
         }
       },
       {
@@ -181,6 +289,12 @@ This page is generated from `src/scenarios/oslo-ambulance.scenario.json` in the 
               "visible": true,
               "collapsed": false,
               "visibleFields": ["victims"]
+            },
+            {
+              "categoryId": "weather",
+              "visible": true,
+              "collapsed": false,
+              "visibleFields": ["air-temperature", "precipitation", "surface"]
             },
             {
               "categoryId": "traffic",

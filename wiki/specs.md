@@ -144,6 +144,8 @@ Supported effects:
 
 Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver. Procedure runners, operators, and AI agents should use this substrate by querying signal values and condition truth, then issuing commands through the generic command path. The process-plant pack must not own procedure document parsing or procedure branch state without a future ADR.
 
+Reusable reference I&C definitions are addressed by `icRef`. V1 includes `process-plant.pressurized-water-reactor.ic.v1`, which is enabled explicitly per process system. `icRef` and inline `protection` are mutually exclusive for one system; the pack rejects both together rather than relying on merge order. Reference I&C is plant automation and annunciation only. It may define normal automatic controllers, protection-like functions, alarm/trip lifecycle state, and validated writes, but it must not define procedure steps, diagnosis trees, operator instructions, or procedure branch state.
+
 ## Event Model Spec
 
 Domain Events are accepted canonical changes ordered by the Control Instance runtime. The Durable Journal records meaningful history. The Live Feed broadcasts updates to connected clients. Volatile movement updates can affect snapshots without bloating the durable journal.

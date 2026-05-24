@@ -1,7 +1,9 @@
 ---
-title: ADR 0017 Process Plant Component Graph
+title: Process Plant Component Graph
 type: adr
 ---
+
+> Mirrored from `docs/adr/0017-process-plant-component-graph.md` in the Leitbild application repository. Run `bun run sync:leitbild` in this wiki repository after ADR source changes.
 
 # ADR 0017: Process Plant Component Graph
 

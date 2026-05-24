@@ -3,7 +3,7 @@ title: Generic Pack Query Surface
 type: adr
 ---
 
-> Mirrored from `docs/adr/0016-generic-pack-query-surface.md` in the Leitbild application repository.
+> Mirrored from `docs/adr/0016-generic-pack-query-surface.md` in the Leitbild application repository. Run `bun run sync:leitbild` in this wiki repository after ADR source changes.
 
 # ADR 0016: Generic Pack Query Surface
 
@@ -48,6 +48,8 @@ Core validates the envelope and routes it to the active simulation provider for 
 Queries are not commands. Query handlers must not mutate provider state, emit events, or commit canonical changes.
 
 Weather map rendering uses this surface. The weather pack contributes `mapAreaFeatureQueries`; the UI calls those queries and caches the returned `PackMapAreaFeature`s for MapLibre source updates. This keeps `MapSurface` generic and synchronous from MapLibre's perspective while allowing weather rendering to use provider-owned H3 truth.
+
+Provider-backed map features may include optional visual animation metadata and an attached symbol anchor. Weather uses this for influence ovals: the provider returns the current and next projected geometry plus anchor points, and the UI interpolates the rendered polygon and cloud icon between query refreshes. The interpolation is presentation-only; H3 affected cells and sparse-field truth remain provider-owned and query-backed.
 
 ## Consequences
 

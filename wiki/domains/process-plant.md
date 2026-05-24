@@ -309,6 +309,26 @@ Current alarm/trip truth is read through `process-plant.ic.status`. The status c
 
 This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, inspect alarm/protection state, evaluate procedure-relevant conditions, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 
+Reference I&C can be enabled explicitly with an `icRef` on one process system. The first reference definition is `process-plant.pressurized-water-reactor.ic.v1`. It is a reusable plant-automation and annunciation set for the reference graph: pressurizer pressure/level indications, heater/spray/relief actions, steam-generator level/radiation/feedwater indications, auxiliary-feedwater actuation, RCP trip/flow indications, condenser/turbine indications, and related alarm/trip lifecycle state. It is not loaded implicitly, and it does not merge silently with inline `protection`; a scenario must choose one or the other for a system.
+
+This reference set must stay below the procedure layer. It can answer "is this plant condition true?", energize reference automatic controls, actuate protection-like functions, and emit alarm/trip state. It must not encode emergency operating procedures, diagnosis trees, procedure step order, operator instructions, or external procedure branch state. Human operators, procedure runners, and AI agents remain responsible for reading procedure documents and deciding what procedure step applies.
+
+```json
+{
+  "packs": {
+    "process-plant": {
+      "systems": [
+        {
+          "id": "unit-1",
+          "graphRef": "process-plant.pressurized-water-reactor.v1",
+          "icRef": "process-plant.pressurized-water-reactor.ic.v1"
+        }
+      ]
+    }
+  }
+}
+```
+
 ## Multi-System Runs
 
 A scenario can instantiate multiple process systems using the same graphRef or different graphRefs. There is no special fleet runtime. Each system has its own compiled runtime, variable table, schedule, telemetry recorder, and provider-private snapshot. The six-unit benchmark is just a measurement fixture, not a design limit.
