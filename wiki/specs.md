@@ -123,6 +123,8 @@ The I&C substrate uses this vocabulary:
 - **Normal controller**: routine automatic control that may request validated writes.
 - **Protection function**: safety-like automatic response that may latch and may require reset conditions.
 - **Alarm state**: persistent current alarm truth plus transition events.
+- **Annunciator metadata**: optional structured alarm/trip metadata for system, equipment, group, first-out grouping, priority, and role.
+- **Mode condition**: an optional rule qualifier expressed with the same condition language, used to make a rule apply only in a declared process state without adding a global mode store.
 - **Permissive**: a condition that must be true before a command/action may proceed.
 - **Interlock**: a condition that prevents, forces, or constrains equipment state.
 - **Validated action**: a constrained effect that goes through signal resolution, writability, type, hard-limit, and phase-boundary checks.
@@ -137,6 +139,7 @@ Supported V1 condition forms:
 - `any`,
 - `not`,
 - simple voting,
+- optional `modeCondition` / `modeLabel`,
 - delay/latch/reset metadata.
 
 Supported effects:
@@ -148,6 +151,8 @@ Supported effects:
 Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver. Procedure runners, operators, and AI agents should use this substrate by querying signal values and condition truth, then issuing commands through the generic command path. The process-plant pack must not own procedure document parsing or procedure branch state without a future ADR.
 
 Procedure tag validation is intentionally separate from procedure execution. `process-plant.procedure-tags.validate` can check whether rows such as `{ "id": "PT-455", "simPath": "...", "units": "MPa", "equipment": "pressurizer" }` resolve against the current graph and whether optional metadata differs. It does not interpret procedure steps, execute procmd, or decide EOP branches.
+
+Control validation is also queryable without mutation. `process-plant.control.validate` accepts the same payload as `process-plant.control.write`, resolves the same signal, checks writability, validates type and hard range, and evaluates permissive/interlock gates. Operators, control-room surfaces, scenario tooling, and AI agents can therefore ask whether an action would be accepted before issuing it.
 
 Reusable reference I&C definitions are addressed by `icRef`. V1 includes `process-plant.pressurized-water-reactor.ic.v1`, which is enabled explicitly per process system. `icRef` and inline `protection` are mutually exclusive for one system; the pack rejects both together rather than relying on merge order. Reference I&C is plant automation and annunciation only. It may define normal automatic controllers, protection-like functions, alarm/trip lifecycle state, and validated writes, but it must not define procedure steps, diagnosis trees, operator instructions, or procedure branch state.
 
