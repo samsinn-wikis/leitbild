@@ -189,6 +189,7 @@ Implemented queries include:
 - `process-plant.signals.read`
 - `process-plant.signals.search`
 - `process-plant.conditions.evaluate`
+- `process-plant.procedure-tags.validate`
 - `process-plant.runtime.status`
 - `process-plant.telemetry.published`
 - `process-plant.trends.read`
@@ -290,7 +291,11 @@ The substrate has six semantic layers:
 
 Rules read signal snapshots and evaluate typed declarative conditions: comparison, `all`, `any`, `not`, simple voting, delay, latch, reset-on-clear, and explicit reset conditions. Effects are constrained to `alarm.enter`, `trip.enter`, or `writeSignal`. Alarm and trip effects create persistent lifecycle state as well as transition events; write effects resolve a signal and queue a validated runtime write for the next solver tick.
 
+Rule classes now have hard semantic meaning. Alarm rules may only enter alarm lifecycle state. Protection rules may only enter trip lifecycle state or request validated writes. Normal-control rules may only request validated writes. Permissive and interlock rules do not emit lifecycle effects; they declare `commandGates` that constrain writes to named target signals. A permissive must be true for the write to proceed. An interlock blocks the write when its condition is true. The provider validates these combinations before a runtime starts, so invalid rule/effect mixtures fail at startup rather than lurking until a rare transient.
+
 External procedure systems remain outside the process-plant pack for now. A procedure runner, human operator, or AI agent can ask for signal values, search procedure-relevant signals, ask whether a condition is true, and issue validated commands. The procedure document, procedure branch state, and procedure execution policy belong to the external procedure runner or human/AI workflow, not to process-plant. `process-plant.conditions.evaluate` is the procedure-facing truth surface: it evaluates the same typed condition shape used by I&C rules and returns both the boolean result and the signals read, including all children of compound conditions.
+
+For procedure documents that carry a tag appendix, `process-plant.procedure-tags.validate` is the compatibility surface. It accepts extracted tag rows such as `id`, `simPath`, `units`, and `equipment`, resolves each tag against the graph-owned signal bindings for one explicit `systemId`, and reports `resolved`, `resolved-with-warnings`, or `missing`. This is intentionally a validator, not a procedure runner. It does not parse procedure markdown, own procedure branch state, or create a second simulator-binding table.
 
 The ordering is important:
 
@@ -310,6 +315,8 @@ Current alarm/trip truth is read through `process-plant.ic.status`. The status c
 This is important for AI agents. An agent can inspect systems, read graph topology, search variables, read current values, inspect configured trends, inspect alarm/protection state, evaluate procedure-relevant conditions, and write only variables that the runtime declares writable. Suggested actions are not plant truth until accepted through the command path and applied by the runtime.
 
 Reference I&C can be enabled explicitly with an `icRef` on one process system. The first reference definition is `process-plant.pressurized-water-reactor.ic.v1`. It is a reusable plant-automation and annunciation set for the reference graph: pressurizer pressure/level indications, heater/spray/relief actions, steam-generator level/radiation/feedwater indications, auxiliary-feedwater actuation, RCP trip/flow indications, condenser/turbine indications, and related alarm/trip lifecycle state. It is not loaded implicitly, and it does not merge silently with inline `protection`; a scenario must choose one or the other for a system.
+
+The reference set is organized internally as small family modules for pressurizer, steam-generator, reactor-coolant-pump, and balance-of-plant rules. That split is for maintainability only. Publicly, scenarios still use the single `icRef`; they do not assemble half a procedure package out of rule fragments.
 
 This reference set must stay below the procedure layer. It can answer "is this plant condition true?", energize reference automatic controls, actuate protection-like functions, and emit alarm/trip state. It must not encode emergency operating procedures, diagnosis trees, procedure step order, operator instructions, or external procedure branch state. Human operators, procedure runners, and AI agents remain responsible for reading procedure documents and deciding what procedure step applies.
 

@@ -79,6 +79,7 @@ Current process-plant queries:
 - `process-plant.signals.read`: resolve signals and return current variable snapshots.
 - `process-plant.signals.search`: search signal bindings by tag, equipment, text, domain, quantity, writability, and publication policy.
 - `process-plant.conditions.evaluate`: evaluate a typed I&C condition for one process system and return both truth and signals read.
+- `process-plant.procedure-tags.validate`: validate extracted procedure tag appendix rows against graph-owned signal bindings.
 - `process-plant.runtime.status`: summarize process runtime status.
 - `process-plant.telemetry.published`: return currently published telemetry variables.
 - `process-plant.trends.read`: read configured trend buffers.
@@ -126,6 +127,8 @@ The I&C substrate uses this vocabulary:
 - **Interlock**: a condition that prevents, forces, or constrains equipment state.
 - **Validated action**: a constrained effect that goes through signal resolution, writability, type, hard-limit, and phase-boundary checks.
 
+Rule classes are not decorative. `alarm` rules may only enter alarms. `protection` rules may enter trips and/or request validated writes. `normalControl` rules may only request validated writes. `permissive` and `interlock` rules must use `commandGates` and must not emit lifecycle effects. A command gate names the target signal it governs. Failed permissives and active interlocks block operator, scenario, AI, and internal I&C writes through the same queued write path.
+
 Supported V1 condition forms:
 
 - comparison/equality against a signal value,
@@ -143,6 +146,8 @@ Supported effects:
 - queue a validated variable write for the next solver tick.
 
 Rules run after a physics tick and before telemetry sampling. They read the completed tick snapshot and never mutate variables mid-solver. Procedure runners, operators, and AI agents should use this substrate by querying signal values and condition truth, then issuing commands through the generic command path. The process-plant pack must not own procedure document parsing or procedure branch state without a future ADR.
+
+Procedure tag validation is intentionally separate from procedure execution. `process-plant.procedure-tags.validate` can check whether rows such as `{ "id": "PT-455", "simPath": "...", "units": "MPa", "equipment": "pressurizer" }` resolve against the current graph and whether optional metadata differs. It does not interpret procedure steps, execute procmd, or decide EOP branches.
 
 Reusable reference I&C definitions are addressed by `icRef`. V1 includes `process-plant.pressurized-water-reactor.ic.v1`, which is enabled explicitly per process system. `icRef` and inline `protection` are mutually exclusive for one system; the pack rejects both together rather than relying on merge order. Reference I&C is plant automation and annunciation only. It may define normal automatic controllers, protection-like functions, alarm/trip lifecycle state, and validated writes, but it must not define procedure steps, diagnosis trees, operator instructions, or procedure branch state.
 
