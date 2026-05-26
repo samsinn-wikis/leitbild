@@ -72,6 +72,7 @@ nav:
     - Oslo Ambulance: scenarios/oslo-ambulance.md
     - Halden: scenarios/halden.md
   - Concepts: concepts.md
+  - Design guides: design-guides.md
   - Domains:
     - Ambulance: domains/ambulance.md
     - Traffic: domains/traffic.md
