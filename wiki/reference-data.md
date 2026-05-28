@@ -10,7 +10,7 @@ type: architecture
 
 Reference data is everything geospatial in Leitbild that is **not canonical operational truth**: slow-moving, externally-sourced, contextual, vector-renderable, read-only at runtime, and licensed. Airspace polygons, airport points, hospital locations, road restrictions, marine zones, and hand-authored scenario overlays all fit this shape.
 
-This page describes the generic abstraction. For the concrete first dataset, see [[domains/airspace|Airspace]].
+This page describes the generic abstraction. For the concrete first dataset, see [[domains/aviation|Aviation]].
 
 ## Why reference data is its own thing
 
@@ -90,7 +90,7 @@ Build, promote, rollback, and status commands are documented in `docs/reference-
 
 ## Related
 
-- [[domains/airspace|Airspace (the first dataset)]]
+- [[domains/aviation|Aviation (airspace and live aircraft)]]
 - ADRs **0019** (pipeline), **0020** (OpenAIP and GeoNorge sources), **0021** (sidecar GeoJSON) in the application repo.
 - [[concepts|Concepts]] — broader Leitbild architecture context.
 - [[design-guides|Design guides]] — Leitbild design constraints (one HTTP server, vector-only base map, validate at trust boundaries).

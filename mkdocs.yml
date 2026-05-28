@@ -73,11 +73,13 @@ nav:
     - Halden: scenarios/halden.md
   - Concepts: concepts.md
   - Design guides: design-guides.md
-  - Domains:
+  - Packs:
     - Ambulance: domains/ambulance.md
+    - Aviation: domains/aviation.md
     - Traffic: domains/traffic.md
     - Weather: domains/weather.md
     - Process Plant: domains/process-plant.md
+    - Electric Grid: packs/electric-grid.md
   - Agent guides: agent-guides.md
   - Specs: specs.md
   - ADRs:
